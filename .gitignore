@@ -1,0 +1,14 @@
+# Ignora las dependencias y entornos de desarrollo
+backend/venv/
+frontend/node_modules/
+
+# Ignora archivos de configuración con información sensible
+.env
+
+# Ignora archivos de bases de datos y caché
+*.sqlite3
+__pycache__/
+*.pyc
+
+# Ignora archivos de log
+*.log
