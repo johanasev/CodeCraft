@@ -1,20 +1,28 @@
-// src/App.jsx
-
 import React from 'react';
-import { Routes, Route } from "react-router-dom";
-import WelcomePage from './app/login/WelcomePage.jsx'; // Importación corregida
+import { Routes, Route, useLocation } from "react-router-dom";
+import WelcomePage from './app/login/WelcomePage.jsx'; 
 import LoginPage from './app/login/LoginPage.jsx'; 
 import AdminDashboard from './app/dashboard/AdminDashboard.jsx'; 
-import UserDashboard from './app/dashboard/UserDashboard.jsx';   // Importación corregida
+import UserDashboard from './app/dashboard/UserDashboard.jsx'; 
+// No necesitamos importar TransactionsDashboard aquí, se importa dentro de AdminDashboard
 
 function App() {
+  const location = useLocation();
+  // Obtiene el nombre de usuario del estado de la ubicación o usa un valor predeterminado
+  const userName = location.state?.userName || 'Administrador';
+
   return (
     <Routes>
       <Route path="/" element={<WelcomePage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/AdminDashboard" element={<AdminDashboard />} />
-      <Route path="/UserDashboard" element={<UserDashboard />} />
-      {/* Puedes agregar más rutas aquí */}
+      
+      {/* CORRECCIÓN CLAVE: Usamos AdminDashboard como el layout para todas las rutas del administrador.
+        La barra lateral se cargará en estas dos rutas:
+      */}
+      <Route path="/admin" element={<AdminDashboard userName={userName} />} />
+      <Route path="/admin/transactions" element={<AdminDashboard userName={userName} />} />
+      
+      <Route path="/user" element={<UserDashboard />} />
     </Routes>
   );
 }

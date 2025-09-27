@@ -38,12 +38,12 @@ const LoginForm = () => {
     if (email === 'admin@codercraft.com' && password === 'admin') {
       // Si es admin, redirige a la ruta de admin
       console.log('Acceso como administrador');
-      navigate('/AdminDashboard');
+      navigate('/admin');
       
     } else if (email === 'user@codercraft.com' && password === 'user') {
       // Si es usuario, redirige a la ruta de usuario
       console.log('Acceso como usuario');
-      navigate('/UserDashboard');
+      navigate('/user');
     } else {
       // Si las credenciales son incorrectas, muestra un error
       setError('Correo electrónico o contraseña incorrectos.');
