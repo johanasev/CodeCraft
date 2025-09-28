@@ -12,18 +12,18 @@ function App() {
   const userName = location.state?.userName || 'Administrador';
 
   return (
-    <Routes>
-      <Route path="/" element={<WelcomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      
-      {/* CORRECCIÓN CLAVE: Usamos AdminDashboard como el layout para todas las rutas del administrador.
-        La barra lateral se cargará en estas dos rutas:
-      */}
-      <Route path="/admin" element={<AdminDashboard userName={userName} />} />
-      <Route path="/admin/transactions" element={<AdminDashboard userName={userName} />} />
-      
-      <Route path="/user" element={<UserDashboard />} />
-    </Routes>
+<Routes>
+  <Route path="/" element={<WelcomePage />} />
+  <Route path="/login" element={<LoginPage />} />
+
+  {/* Agrupamos rutas hijas del admin */}
+  <Route path="/admin" element={<AdminDashboard userName={userName} />} />
+  <Route path="/admin/transactions" element={<AdminDashboard userName={userName} />} />
+  <Route path="/admin/users" element={<AdminDashboard userName={userName} />} />
+
+  <Route path="/user" element={<UserDashboard />} />
+</Routes>
+
   );
 }
 

@@ -26,3 +26,22 @@ export const uniqueFilters = {
     users: Array.from(new Set(initialTransactions.map(t => t.user))).sort(),
     references: Array.from(new Set(initialTransactions.map(t => t.reference))).sort(),
 };
+
+/**
+ * Genera el ID de la siguiente transacción de forma incremental basado en el array actual.
+ * @param {Array<Object>} transactions - La lista actual de transacciones.
+ * @returns {string} El siguiente ID (ej: 'TRX-009').
+ */
+export const generateNextId = (transactions) => {
+    if (transactions.length === 0) return 'TRX-001';
+    
+    // Obtener el número máximo existente
+    const maxNumber = transactions.reduce((max, trx) => {
+      const currentNumber = parseInt(trx.id.split('-')[1]);
+      return currentNumber > max ? currentNumber : max;
+    }, 0);
+
+    const nextNumber = maxNumber + 1;
+    
+    return `TRX-${String(nextNumber).padStart(3, '0')}`;
+  }

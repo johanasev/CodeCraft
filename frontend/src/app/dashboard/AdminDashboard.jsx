@@ -1,7 +1,8 @@
+import { Link, useLocation } from 'react-router-dom';
 import React, { useState } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
-import { Link, useLocation } from 'react-router-dom';
 import TransactionsDashboard from './TransactionsDashboard';
+import UserManagementView from './UserManagementView';
 
 const AdminDashboard = ({ userName }) => {
   const location = useLocation();
@@ -42,15 +43,18 @@ const AdminDashboard = ({ userName }) => {
   );
 
   // Mapeo de la ruta actual al componente de contenido
-  let mainContent;
-  switch (location.pathname) {
-    case '/admin/transactions':
-      mainContent = <TransactionsDashboard />;
-      break;
-    default:
-      mainContent = WelcomeContent;
-      break;
-  }
+ let mainContent;
+switch (location.pathname) {
+  case '/admin/transactions':
+    mainContent = <TransactionsDashboard />;
+    break;
+  case '/admin/users':
+    mainContent = <UserManagementView />;
+    break;
+  default:
+    mainContent = WelcomeContent;
+    break;
+}
 
   return (
     <div className="flex w-screen h-screen bg-slate-200">
@@ -92,7 +96,9 @@ const AdminDashboard = ({ userName }) => {
             <Link to="#" className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
               Productos
             </Link>
-            <Link to="#" className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
+            <Link 
+              to="/admin/users"  
+              className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
               Usuarios
             </Link>
           </nav>

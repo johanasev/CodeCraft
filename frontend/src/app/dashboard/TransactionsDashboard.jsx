@@ -66,7 +66,7 @@ const getDependentFilters = (transactions, currentFilters) => {
 
 const TransactionsDashboard = () => {
   // Estado principal de todas las transacciones (la base de datos simulada)
-  const [transactions] = useState(initialTransactions);
+const [transactions, setTransactions] = useState(initialTransactions);
   const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el modal
   
   // Estado para guardar los valores de los filtros seleccionados
@@ -140,6 +140,16 @@ const TransactionsDashboard = () => {
   // Handlers placeholder para las acciones de la tabla
   const handleEdit = (id) => console.log(`Editar Transacción ${id}`);
   const handleDelete = (id) => console.log(`Eliminar Transacción ${id}`);
+
+  const [formData, setFormData] = useState({
+    date: '',
+    product: '',
+    reference: '',
+    type: 'ENTRADA',
+    quantity: '',
+    user: '',
+    observation: ''
+  });
 
   return (
     <div className="p-8"> 
@@ -301,7 +311,145 @@ const TransactionsDashboard = () => {
           )}
         </div>
       </div>
-      {/* Aquí irá el Modal */}
+      
+     {/* --- MODAL PARA AGREGAR MOVIMIENTO --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg relative animate-fadeIn">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800">Agregar Nuevo Movimiento</h2>
+            
+            {/* FORMULARIO */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                // Crear nuevo objeto de transacción
+                const newTransaction = {
+                  id: generateNextId(transactions),
+                  date: formData.date || new Date().toISOString().slice(0, 10),
+                  product: formData.product,
+                  reference: formData.reference,
+                  type: formData.type,
+                  quantity: Number(formData.quantity),
+                  user: formData.user,
+                  observation: formData.observation,
+                };
+                
+                // Actualizar el estado
+                setTransactions([...transactions, newTransaction]);
+                setIsModalOpen(false);
+                setFormData({ // limpiar campos
+                  date: '',
+                  product: '',
+                  reference: '',
+                  type: 'ENTRADA',
+                  quantity: '',
+                  user: '',
+                  observation: ''
+                });
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Fecha</label>
+                  <input 
+                    type="date" 
+                    value={formData.date}
+                    onChange={(e) => setFormData({...formData, date: e.target.value})}
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Producto</label>
+                  <input 
+                    type="text" 
+                    value={formData.product}
+                    onChange={(e) => setFormData({...formData, product: e.target.value})}
+                    required
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Referencia</label>
+                  <input 
+                    type="text" 
+                    value={formData.reference}
+                    onChange={(e) => setFormData({...formData, reference: e.target.value})}
+                    required
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tipo</label>
+                  <select 
+                    value={formData.type}
+                    onChange={(e) => setFormData({...formData, type: e.target.value})}
+                    className="w-full border rounded-lg p-2"
+                  >
+                    <option value="ENTRADA">ENTRADA</option>
+                    <option value="SALIDA">SALIDA</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cantidad</label>
+                  <input 
+                    type="number" 
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                    required
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Usuario</label>
+                  <input 
+                    type="text" 
+                    value={formData.user}
+                    onChange={(e) => setFormData({...formData, user: e.target.value})}
+                    required
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Observación</label>
+                <textarea 
+                  value={formData.observation}
+                  onChange={(e) => setFormData({...formData, observation: e.target.value})}
+                  className="w-full border rounded-lg p-2"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition"
+                >
+                  Guardar Movimiento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+
+
     </div>
   );
 };
