@@ -20,6 +20,7 @@ function App() {
   <Route path="/admin" element={<AdminDashboard userName={userName} />} />
   <Route path="/admin/transactions" element={<AdminDashboard userName={userName} />} />
   <Route path="/admin/users" element={<AdminDashboard userName={userName} />} />
+  <Route path="/admin/products" element={<AdminDashboard userName={userName} />} />
 
   <Route path="/user" element={<UserDashboard />} />
 </Routes>

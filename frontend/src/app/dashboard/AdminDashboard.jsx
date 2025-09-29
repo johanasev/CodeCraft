@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
 import TransactionsDashboard from './TransactionsDashboard';
 import UserManagementView from './UserManagementView';
+import ProductManagementView from './ProductManagementView';
 
 const AdminDashboard = ({ userName }) => {
   const location = useLocation();
@@ -51,6 +52,9 @@ switch (location.pathname) {
   case '/admin/users':
     mainContent = <UserManagementView />;
     break;
+  case '/admin/products':
+    mainContent = <ProductManagementView />;
+    break;
   default:
     mainContent = WelcomeContent;
     break;
@@ -93,7 +97,9 @@ switch (location.pathname) {
             >
               Transacciones
             </Link>
-            <Link to="#" className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
+            <Link 
+              to="/admin/products" 
+              className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
               Productos
             </Link>
             <Link 

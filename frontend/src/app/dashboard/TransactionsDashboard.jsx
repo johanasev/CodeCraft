@@ -278,7 +278,7 @@ const [transactions, setTransactions] = useState(initialTransactions);
           Agregar Movimiento
         </button>
         <button className="bg-gray-700 text-white py-2 px-6 rounded-lg shadow-md hover:bg-gray-800 transition-colors font-semibold">
-          Historial Completo
+          Ver Historial
         </button>
       </div>
       
