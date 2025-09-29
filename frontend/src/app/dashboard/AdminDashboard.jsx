@@ -55,6 +55,9 @@ switch (location.pathname) {
   case '/admin/products':
     mainContent = <ProductManagementView />;
     break;
+    case '/admin/transactions/history':
+      mainContent = <TransactionsDashboard />;
+      break;
   default:
     mainContent = WelcomeContent;
     break;

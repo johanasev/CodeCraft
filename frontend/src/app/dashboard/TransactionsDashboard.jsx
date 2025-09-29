@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from "react-router-dom";
 // Importamos íconos para las acciones de la tabla
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -66,7 +67,9 @@ const getDependentFilters = (transactions, currentFilters) => {
 
 const TransactionsDashboard = () => {
   // Estado principal de todas las transacciones (la base de datos simulada)
-const [transactions, setTransactions] = useState(initialTransactions);
+  const navigate = useNavigate();
+
+  const [transactions, setTransactions] = useState(initialTransactions);
   const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el modal
   
   // Estado para guardar los valores de los filtros seleccionados
@@ -150,6 +153,7 @@ const [transactions, setTransactions] = useState(initialTransactions);
     user: '',
     observation: ''
   });
+
 
   return (
     <div className="p-8"> 
@@ -277,7 +281,14 @@ const [transactions, setTransactions] = useState(initialTransactions);
         >
           Agregar Movimiento
         </button>
-        <button className="bg-gray-700 text-white py-2 px-6 rounded-lg shadow-md hover:bg-gray-800 transition-colors font-semibold">
+        <button
+          onClick={() =>
+            navigate("/admin/transactions/history", {
+              state: { transactions: filteredTransactions }, // 👈 Pasamos los datos filtrados o todos
+            })
+          }
+          className="bg-gray-700 text-white py-2 px-6 rounded-lg shadow-md hover:bg-gray-800 transition-colors font-semibold"
+        >
           Ver Historial
         </button>
       </div>
