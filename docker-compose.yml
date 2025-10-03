@@ -1,19 +1,44 @@
-version: '3.8'
-
 services:
   db:
     image: mysql:8.0
-    container_name: codecraft-mysql
     restart: always
     environment:
-      MYSQL_DATABASE: 'codecraft_db'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'password'
-      MYSQL_ROOT_PASSWORD: 'password'
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
-      - "3306:3306"
+      - "3306:3306"  # Solo para desarrollo, remover en producción
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+  
+  # Servicio web (opcional para futuro)
+  # web:
+  #   build: ./backend
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - SECRET_KEY=${SECRET_KEY}
+  #     - DEBUG=${DEBUG}
+  #     - DB_NAME=${DB_NAME}
+  #     - DB_USER=${DB_USER}
+  #     - DB_PASSWORD=${DB_PASSWORD}
+  #     - DB_HOST=db
+  #   depends_on:
+  #     - db
+  #   networks:
+  #     - app-net
 
 volumes:
   db_data:
+
+networks:
+  app-net:
+    driver: bridge
