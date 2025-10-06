@@ -120,9 +120,9 @@ class TransactionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Transaction
-        fields = ['id', 'user', 'user_name', 'user_email', 'product', 'product_name', 
+        fields = ['id', 'user', 'user_name', 'user_email', 'product', 'product_name',
                  'product_reference', 'date', 'type', 'supplier', 'quantity', 'price']
-        read_only_fields = ['date', 'user_name', 'user_email', 'product_name', 'product_reference']
+        read_only_fields = ['user', 'date', 'user_name', 'user_email', 'product_name', 'product_reference']
 
     def validate_quantity(self, value):
         if value <= 0:

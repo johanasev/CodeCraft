@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const UserDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [image, setImage] = useState(null);
 
   const handleImageUpload = (e) => {
@@ -14,8 +17,16 @@ const UserDashboard = () => {
       };
       reader.readAsDataURL(file);
     }
-    const UserDashboard = ({ userName }) => {
-    } 
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      navigate('/');
+    }
   };
 
   return (
@@ -61,9 +72,12 @@ const UserDashboard = () => {
         
         {/* Logout Button - Botón de cerrar sesión */}
         <div className="p-4">
-          <Link to="/" className="w-full text-center block mb-10 py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors">
+          <button
+            onClick={handleLogout}
+            className="w-full text-center mb-10 py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors"
+          >
             Cerrar Sesión
-          </Link>
+          </button>
         </div>
       </div>
       

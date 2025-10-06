@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { authService } from '../api/authService';
 
 // --- Corrección de error: Se reemplazan los íconos de 'react-icons' por SVGs en línea ---
 // Esto elimina la necesidad de una librería externa y soluciona el error de compilación.
@@ -28,24 +29,34 @@ const LoginForm = () => {
   const navigate = useNavigate(); // Hook para redirigir al usuario
 
   // Función que se ejecuta al enviar el formulario
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault(); // Evita que la página se recargue
 
     // Limpiar errores previos
     setError('');
 
-    // Validación de credenciales
-    if (email === 'admin@codercraft.com' && password === 'admin') {
-      // Si es admin, redirige a la ruta de admin
-      console.log('Acceso como administrador');
-      navigate('/admin');
-      
-    } else if (email === 'user@codercraft.com' && password === 'user') {
-      // Si es usuario, redirige a la ruta de usuario
-      console.log('Acceso como usuario');
-      navigate('/user');
-    } else {
+    try {
+      // Llamada al backend para autenticación
+      const data = await authService.login(email, password);
+
+      // Guardar tokens en localStorage
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Redirigir según el rol del usuario
+      const fullName = `${data.user.first_name} ${data.user.last_name}`;
+
+      if (data.user.role_name === 'administrador') {
+        console.log('Acceso como administrador');
+        navigate('/admin', { state: { userName: fullName } });
+      } else {
+        console.log('Acceso como usuario');
+        navigate('/user', { state: { userName: fullName } });
+      }
+    } catch (err) {
       // Si las credenciales son incorrectas, muestra un error
+      console.error('Error de login:', err);
       setError('Correo electrónico o contraseña incorrectos.');
     }
   };

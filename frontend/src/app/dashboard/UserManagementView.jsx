@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaEdit, FaTrashAlt } from 'react-icons/fa';
+import { inventoryService } from '../../api/inventoryService';
 
 const UserManagementView = () => {
   // 📦 Lista de usuarios
-  const [users, setUsers] = useState([
-    { id: 1, creationDate: '2025-01-15', email: 'usuario1@example.com', role: 'Administrador', name: 'Usuario Uno' },
-    { id: 2, creationDate: '2025-02-20', email: 'usuario2@example.com', role: 'Usuario', name: 'Usuario Dos' },
-    { id: 3, creationDate: '2025-03-10', email: 'usuario3@example.com', role: 'Usuario', name: 'Usuario Tres' },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // 📦 Estados modales
   const [showModal, setShowModal] = useState(false);
@@ -22,12 +22,49 @@ const UserManagementView = () => {
 
   // 📦 Estado del formulario de nuevo usuario
   const [newUser, setNewUser] = useState({
-    name: '',
+    first_name: '',
+    last_name: '',
     email: '',
-    role: 'Usuario',
+    phone: '',
+    address: '',
+    role: '',
     password: '',
-    confirmPassword: '',
+    password_confirm: '',
   });
+
+  // 🔄 Cargar usuarios y roles al montar el componente
+  useEffect(() => {
+    fetchUsers();
+    fetchRoles();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await inventoryService.getUsers();
+      // La API puede devolver un objeto con paginación o un array directo
+      const usersList = Array.isArray(data) ? data : (data.results || []);
+      setUsers(usersList);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Error al cargar usuarios');
+      setUsers([]); // Asegurar que users sea un array aunque haya error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const data = await inventoryService.getRoles();
+      const rolesList = Array.isArray(data) ? data : (data.results || []);
+      setRoles(rolesList);
+    } catch (err) {
+      console.error('Error fetching roles:', err);
+      setRoles([]); // Asegurar que roles sea un array aunque haya error
+    }
+  };
 
   // 🛠️ Manejar inputs de creación
   const handleChange = (e) => {
@@ -36,31 +73,41 @@ const UserManagementView = () => {
   };
 
   // 🛠️ Crear usuario
-  const handleCreateUser = () => {
-    if (newUser.password !== newUser.confirmPassword) {
+  const handleCreateUser = async () => {
+    if (newUser.password !== newUser.password_confirm) {
       alert('❌ Las contraseñas no coinciden');
       return;
     }
 
-    const newId = users.length > 0 ? users[users.length - 1].id + 1 : 1;
-    const today = new Date().toISOString().split('T')[0];
+    if (!newUser.first_name || !newUser.last_name || !newUser.email || !newUser.password || !newUser.role) {
+      alert('❌ Por favor complete todos los campos obligatorios');
+      return;
+    }
 
-    const userToAdd = {
-      id: newId,
-      creationDate: today,
-      email: newUser.email,
-      role: newUser.role,
-      name: newUser.name,
-    };
-
-    setUsers([...users, userToAdd]);
-    handleCloseModal();
+    try {
+      await inventoryService.createUser(newUser);
+      await fetchUsers();
+      handleCloseModal();
+      alert('✅ Usuario creado exitosamente');
+    } catch (err) {
+      console.error('Error creating user:', err);
+      alert('❌ Error al crear usuario: ' + (err.response?.data?.detail || 'Error desconocido'));
+    }
   };
 
   // 🛠️ Cerrar modal creación
   const handleCloseModal = () => {
     setShowModal(false);
-    setNewUser({ name: '', email: '', role: 'Usuario', password: '', confirmPassword: '' });
+    setNewUser({
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      address: '',
+      role: '',
+      password: '',
+      password_confirm: '',
+    });
   };
 
   // 🛠️ Eliminar usuario
@@ -69,10 +116,17 @@ const UserManagementView = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDeleteUser = () => {
-    setUsers(users.filter((u) => u.id !== userToDelete.id));
-    setShowDeleteModal(false);
-    setUserToDelete(null);
+  const confirmDeleteUser = async () => {
+    try {
+      await inventoryService.deleteUser(userToDelete.id);
+      await fetchUsers();
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+      alert('✅ Usuario eliminado exitosamente');
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('❌ Error al eliminar usuario');
+    }
   };
 
   const cancelDelete = () => {
@@ -91,11 +145,39 @@ const UserManagementView = () => {
     setUserToEdit({ ...userToEdit, [name]: value });
   };
 
-  const handleUpdateUser = () => {
-    setUsers(users.map((u) => (u.id === userToEdit.id ? userToEdit : u)));
-    setShowEditModal(false);
-    setUserToEdit(null);
+  const handleUpdateUser = async () => {
+    try {
+      await inventoryService.updateUser(userToEdit.id, userToEdit);
+      await fetchUsers();
+      setShowEditModal(false);
+      setUserToEdit(null);
+      alert('✅ Usuario actualizado exitosamente');
+    } catch (err) {
+      console.error('Error updating user:', err);
+      alert('❌ Error al actualizar usuario');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-8 bg-slate-200 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-sky-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen p-8 bg-slate-200 flex items-center justify-center">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-8 bg-slate-200">
@@ -131,29 +213,41 @@ const UserManagementView = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b border-gray-200 last:border-b-0 text-left">
-                  <td className="py-4 px-4 text-sm text-gray-700">{user.id}</td>
-                  <td className="py-4 px-4 text-sm text-gray-700">{user.creationDate}</td>
-                  <td className="py-4 px-4 text-sm text-gray-700">{user.name}</td>
-                  <td className="py-4 px-4 text-sm text-gray-700">{user.email}</td>
-                  <td className="py-4 px-4 text-sm text-gray-700">{user.role}</td>
-                  <td className="py-4 px-4 text-right">
-                    <button
-                      className="text-sky-600 hover:text-sky-800 transition-colors mr-3"
-                      onClick={() => handleEdit(user)}
-                    >
-                      <FaEdit className="inline text-lg" />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                      onClick={() => handleDelete(user)}
-                    >
-                      <FaTrashAlt className="inline text-lg" />
-                    </button>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-gray-500">
+                    No hay usuarios registrados
                   </td>
                 </tr>
-              ))}
+              ) : (
+                users.map((user) => (
+                  <tr key={user.id} className="border-b border-gray-200 last:border-b-0 text-left">
+                    <td className="py-4 px-4 text-sm text-gray-700">{user.id}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700">
+                      {new Date(user.registration_date).toLocaleDateString('es-CO')}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700">
+                      {user.first_name} {user.last_name}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700">{user.email}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700">{user.role_name}</td>
+                    <td className="py-4 px-4 text-right">
+                      <button
+                        className="text-sky-600 hover:text-sky-800 transition-colors mr-3"
+                        onClick={() => handleEdit(user)}
+                      >
+                        <FaEdit className="inline text-lg" />
+                      </button>
+                      <button
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                        onClick={() => handleDelete(user)}
+                      >
+                        <FaTrashAlt className="inline text-lg" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -165,61 +259,106 @@ const UserManagementView = () => {
           <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-lg relative">
             <h3 className="text-2xl font-bold mb-6 text-gray-800">Agregar Nuevo Usuario</h3>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold mb-1">Nombre</label>
+                <label className="block text-sm font-semibold mb-1">Nombre *</label>
                 <input
                   type="text"
-                  name="name"
-                  value={newUser.name}
+                  name="first_name"
+                  value={newUser.first_name}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1">Correo</label>
+                <label className="block text-sm font-semibold mb-1">Apellido *</label>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={newUser.last_name}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  required
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-semibold mb-1">Correo *</label>
                 <input
                   type="email"
                   name="email"
                   value={newUser.email}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1">Rol</label>
+                <label className="block text-sm font-semibold mb-1">Teléfono</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={newUser.phone}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Rol *</label>
                 <select
                   name="role"
                   value={newUser.role}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  required
                 >
-                  <option value="Usuario">Usuario</option>
-                  <option value="Administrador">Administrador</option>
+                  <option value="">Seleccione un rol</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
+              <div className="col-span-2">
+                <label className="block text-sm font-semibold mb-1">Dirección</label>
+                <input
+                  type="text"
+                  name="address"
+                  value={newUser.address}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
+              </div>
+
               <div>
-                <label className="block text-sm font-semibold mb-1">Contraseña</label>
+                <label className="block text-sm font-semibold mb-1">Contraseña *</label>
                 <input
                   type="password"
                   name="password"
                   value={newUser.password}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  required
+                  minLength="8"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1">Confirmar Contraseña</label>
+                <label className="block text-sm font-semibold mb-1">Confirmar Contraseña *</label>
                 <input
                   type="password"
-                  name="confirmPassword"
-                  value={newUser.confirmPassword}
+                  name="password_confirm"
+                  value={newUser.password_confirm}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  required
+                  minLength="8"
                 />
               </div>
             </div>
@@ -274,24 +413,46 @@ const UserManagementView = () => {
           <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-lg relative">
             <h3 className="text-2xl font-bold mb-6 text-gray-800">Editar Usuario</h3>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold mb-1">Nombre</label>
                 <input
                   type="text"
-                  name="name"
-                  value={userToEdit.name}
+                  name="first_name"
+                  value={userToEdit.first_name}
                   onChange={handleEditChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
                 />
               </div>
 
               <div>
+                <label className="block text-sm font-semibold mb-1">Apellido</label>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={userToEdit.last_name}
+                  onChange={handleEditChange}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
+              </div>
+
+              <div className="col-span-2">
                 <label className="block text-sm font-semibold mb-1">Correo</label>
                 <input
                   type="email"
                   name="email"
                   value={userToEdit.email}
+                  onChange={handleEditChange}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Teléfono</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={userToEdit.phone || ''}
                   onChange={handleEditChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
                 />
@@ -305,9 +466,23 @@ const UserManagementView = () => {
                   onChange={handleEditChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
                 >
-                  <option value="Usuario">Usuario</option>
-                  <option value="Administrador">Administrador</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
                 </select>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-semibold mb-1">Dirección</label>
+                <input
+                  type="text"
+                  name="address"
+                  value={userToEdit.address || ''}
+                  onChange={handleEditChange}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
               </div>
             </div>
 

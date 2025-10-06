@@ -1,12 +1,16 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
+import { useAuth } from '../../context/AuthContext';
 import TransactionsDashboard from './TransactionsDashboard';
+import TransactionManagementView from './TransactionManagementView';
 import UserManagementView from './UserManagementView';
 import ProductManagementView from './ProductManagementView';
 
 const AdminDashboard = ({ userName }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [image, setImage] = useState(null);
 
   const handleImageUpload = (e) => {
@@ -17,6 +21,17 @@ const AdminDashboard = ({ userName }) => {
         setImage(reader.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Aún así redirigir al login
+      navigate('/');
     }
   };
 
@@ -47,7 +62,7 @@ const AdminDashboard = ({ userName }) => {
  let mainContent;
 switch (location.pathname) {
   case '/admin/transactions':
-    mainContent = <TransactionsDashboard />;
+    mainContent = <TransactionManagementView />;
     break;
   case '/admin/users':
     mainContent = <UserManagementView />;
@@ -55,9 +70,9 @@ switch (location.pathname) {
   case '/admin/products':
     mainContent = <ProductManagementView />;
     break;
-    case '/admin/transactions/history':
-      mainContent = <TransactionsDashboard />;
-      break;
+  case '/admin/transactions/history':
+    mainContent = <TransactionsDashboard />;
+    break;
   default:
     mainContent = WelcomeContent;
     break;
@@ -115,9 +130,12 @@ switch (location.pathname) {
         
         {/* Logout Button - Botón de cerrar sesión */}
         <div className="p-4">
-          <Link to="/" className="w-full text-center block py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors">
+          <button
+            onClick={handleLogout}
+            className="w-full text-center py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors"
+          >
             Cerrar Sesión
-          </Link>
+          </button>
         </div>
       </div>
       

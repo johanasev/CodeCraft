@@ -51,6 +51,7 @@ Antes de clonar el repositorio, asegúrate de tener instalados los siguientes pr
   python -m venv venv
   # En Windows: venv\Scripts\activate
   # En macOS/Linux: source venv/bin/activate
+  
   ```
   - Instala las dependencias de Django y Django REST Framework.
 
