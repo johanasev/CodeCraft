@@ -5,6 +5,8 @@ import LoginPage from './app/login/LoginPage.jsx';
 import AdminDashboard from './app/dashboard/AdminDashboard.jsx'; 
 import UserDashboard from './app/dashboard/UserDashboard.jsx'; 
 import TransactionHistory from './app/dashboard/TransactionHistory.jsx';
+import Proveedores from './app/dashboard/Suppliers.jsx';
+import Suppliers from './app/dashboard/Suppliers.jsx';
 // No necesitamos importar TransactionsDashboard aquí, se importa dentro de AdminDashboard
 
 function App() {
@@ -23,6 +25,7 @@ function App() {
   <Route path="/admin/users" element={<AdminDashboard userName={userName} />} />
   <Route path="/admin/products" element={<AdminDashboard userName={userName} />} />
   <Route path='/admin/transactions/history' element={<TransactionHistory userName={userName} />} />
+  <Route path='/admin/suppliers' element={<AdminDashboard userName={userName} />} />
 
   <Route path="/user" element={<UserDashboard />} />
 </Routes>
