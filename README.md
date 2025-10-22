@@ -141,6 +141,5 @@ python manage.py runserver
 <summary><h3>🤝 Team</h3></summary>
 
 > - *Johana Sevillano* 
-> - *Mariana Carvajal*
 > - *Juan Cardona*
 </details>

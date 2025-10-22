@@ -1,35 +1,36 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { Routes, Route, useLocation } from "react-router-dom";
+import WelcomePage from './app/login/WelcomePage.jsx'; 
+import LoginPage from './app/login/LoginPage.jsx'; 
+import AdminDashboard from './app/dashboard/AdminDashboard.jsx'; 
+import UserDashboard from './app/dashboard/UserDashboard.jsx'; 
+import TransactionHistory from './app/dashboard/TransactionHistory.jsx';
+import Proveedores from './app/dashboard/Suppliers.jsx';
+import Suppliers from './app/dashboard/Suppliers.jsx';
+// No necesitamos importar TransactionsDashboard aquí, se importa dentro de AdminDashboard
 
 function App() {
-  const [count, setCount] = useState(0)
+  const location = useLocation();
+  // Obtiene el nombre de usuario del estado de la ubicación o usa un valor predeterminado
+  const userName = location.state?.userName || 'Administrador';
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+<Routes>
+  <Route path="/" element={<WelcomePage />} />
+  <Route path="/login" element={<LoginPage />} />
+
+  {/* Agrupamos rutas hijas del admin */}
+  <Route path="/admin" element={<AdminDashboard userName={userName} />} />
+  <Route path="/admin/transactions" element={<AdminDashboard userName={userName} />} />
+  <Route path="/admin/users" element={<AdminDashboard userName={userName} />} />
+  <Route path="/admin/products" element={<AdminDashboard userName={userName} />} />
+  <Route path='/admin/transactions/history' element={<TransactionHistory userName={userName} />} />
+  <Route path='/admin/suppliers' element={<AdminDashboard userName={userName} />} />
+
+  <Route path="/user" element={<UserDashboard />} />
+</Routes>
+
+  );
 }
 
-export default App
+export default App;
