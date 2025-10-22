@@ -6,6 +6,7 @@ import TransactionsDashboard from './TransactionsDashboard';
 import TransactionManagementView from './TransactionManagementView';
 import UserManagementView from './UserManagementView';
 import ProductManagementView from './ProductManagementView';
+import Suppliers from './Suppliers.jsx';
 
 const AdminDashboard = ({ userName }) => {
   const location = useLocation();
@@ -59,24 +60,27 @@ const AdminDashboard = ({ userName }) => {
   );
 
   // Mapeo de la ruta actual al componente de contenido
- let mainContent;
-switch (location.pathname) {
-  case '/admin/transactions':
-    mainContent = <TransactionManagementView />;
-    break;
-  case '/admin/users':
-    mainContent = <UserManagementView />;
-    break;
-  case '/admin/products':
-    mainContent = <ProductManagementView />;
-    break;
-  case '/admin/transactions/history':
-    mainContent = <TransactionsDashboard />;
-    break;
-  default:
-    mainContent = WelcomeContent;
-    break;
-}
+  let mainContent;
+  switch (location.pathname) {
+    case '/admin/transactions':
+      mainContent = <TransactionManagementView />;
+      break;
+    case '/admin/users':
+      mainContent = <UserManagementView />;
+      break;
+    case '/admin/products':
+      mainContent = <ProductManagementView />;
+      break;
+    case '/admin/transactions/history':
+      mainContent = <TransactionsDashboard />;
+      break;
+    case '/admin/suppliers':
+      mainContent = <Suppliers />;
+      break;
+    default:
+      mainContent = WelcomeContent;
+      break;
+  }
 
   return (
     <div className="flex w-screen h-screen bg-slate-200">
@@ -106,28 +110,33 @@ switch (location.pathname) {
             <p className="text-xs text-gray-600">Recursos Humanos</p>
             <span className="text-xs text-gray-400">ADMINISTRADOR</span>
           </div>
-          
+
           {/* Navigation Buttons - Botones de navegación */}
-          <nav className="flex flex-col space-y-2"> 
-            <Link 
-              to="/admin/transactions" 
+          <nav className="flex flex-col space-y-2">
+            <Link
+              to="/admin/transactions"
               className={`w-full text-center py-2 px-4 rounded-lg transition-colors text-white ${isTransactionsActive ? 'bg-sky-600 shadow-lg' : 'bg-codecraftBlue hover:bg-sky-500'}`}
             >
               Transacciones
             </Link>
-            <Link 
-              to="/admin/products" 
+            <Link
+              to="/admin/products"
               className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
               Productos
             </Link>
-            <Link 
-              to="/admin/users"  
+            <Link
+              to="/admin/suppliers"
+              className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
+              Proveedores
+            </Link>
+            <Link
+              to="/admin/users"
               className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
               Usuarios
             </Link>
           </nav>
         </div>
-        
+
         {/* Logout Button - Botón de cerrar sesión */}
         <div className="p-4">
           <button
@@ -138,9 +147,9 @@ switch (location.pathname) {
           </button>
         </div>
       </div>
-      
+
       {/* Main Content Area - Área de contenido principal */}
-      <div className="flex-1 overflow-y-auto ml-56"> 
+      <div className="flex-1 overflow-y-auto ml-56">
         {mainContent}
       </div>
     </div>

@@ -5,7 +5,8 @@ import LoginPage from './app/login/LoginPage.jsx';
 import AdminDashboard from './app/dashboard/AdminDashboard.jsx';
 import UserDashboard from './app/dashboard/UserDashboard.jsx';
 import TransactionHistory from './app/dashboard/TransactionHistory.jsx';
-import PrivateRoute from './components/PrivateRoute.jsx';
+import Proveedores from './app/dashboard/Suppliers.jsx';
+import Suppliers from './app/dashboard/Suppliers.jsx';
 // No necesitamos importar TransactionsDashboard aquí, se importa dentro de AdminDashboard
 
 function App() {
@@ -14,44 +15,25 @@ function App() {
   const userName = location.state?.userName || 'Administrador';
 
   return (
-<Routes>
-  <Route path="/" element={<WelcomePage />} />
-  <Route path="/login" element={<LoginPage />} />
+    <Routes>
+      <Route path="/" element={<WelcomePage />} />
+      <Route path="/login" element={<LoginPage />} />
 
-  {/* Rutas protegidas del admin */}
-  <Route path="/admin" element={
-    <PrivateRoute requiredRole="administrador">
-      <AdminDashboard userName={userName} />
-    </PrivateRoute>
-  } />
-  <Route path="/admin/transactions" element={
-    <PrivateRoute requiredRole="administrador">
-      <AdminDashboard userName={userName} />
-    </PrivateRoute>
-  } />
-  <Route path="/admin/users" element={
-    <PrivateRoute requiredRole="administrador">
-      <AdminDashboard userName={userName} />
-    </PrivateRoute>
-  } />
-  <Route path="/admin/products" element={
-    <PrivateRoute requiredRole="administrador">
-      <AdminDashboard userName={userName} />
-    </PrivateRoute>
-  } />
-  <Route path='/admin/transactions/history' element={
-    <PrivateRoute requiredRole="administrador">
-      <TransactionHistory userName={userName} />
-    </PrivateRoute>
-  } />
+      {/* Agrupamos rutas hijas del admin */}
+      <Route path="/admin" element={<AdminDashboard userName={userName} />} />
+      <Route path="/admin/transactions" element={<AdminDashboard userName={userName} />} />
+      <Route path="/admin/users" element={<AdminDashboard userName={userName} />} />
+      <Route path="/admin/products" element={<AdminDashboard userName={userName} />} />
+      <Route path='/admin/transactions/history' element={<TransactionHistory userName={userName} />} />
+      <Route path='/admin/suppliers' element={<AdminDashboard userName={userName} />} />
 
-  {/* Ruta protegida del usuario */}
-  <Route path="/user" element={
-    <PrivateRoute>
-      <UserDashboard />
-    </PrivateRoute>
-  } />
-</Routes>
+      {/* Ruta protegida del usuario */}
+      <Route path="/user" element={
+        <PrivateRoute>
+          <UserDashboard />
+        </PrivateRoute>
+      } />
+    </Routes>
 
   );
 }
