@@ -56,8 +56,8 @@ const exportToPDF = () => {
   doc.text("CodeCraft – Sistema de Gestión de Inventarios", 14, 20);
   doc.setFontSize(13);
   doc.text("Listado de Proveedores", 14, 30);
-  doc.setFontSize(10);
-  doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
+doc.setFontSize(10);
+doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
 
   const tableData = proveedoresFiltrados.map((p) => [
     p.id,

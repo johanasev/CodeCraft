@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { Link, useLocation } from 'react-router-dom';
+// Importa las vistas de usuario aquí cuando estén listas
+// import UserTransactionsView from './UserTransactionsView';
+import UserProductsView from './UserProductsView';
+import UserTransactionsView from './UserTransactionsView.jsx';
 
-const UserDashboard = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
+const UserDashboard = ({ userName }) => {
+  const location = useLocation();
   const [image, setImage] = useState(null);
+  
+  // Define un color azul más claro o diferente para distinguirlo del Admin, si es necesario.
+  // Usaremos el mismo 'bg-sky-500' que el Admin para mantener la estética, pero ajustamos el activo.
+  const CODECRAFT_BLUE = 'bg-sky-500';
+  const ACTIVE_BLUE = 'bg-sky-600 shadow-lg';
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -17,28 +24,54 @@ const UserDashboard = () => {
       };
       reader.readAsDataURL(file);
     }
+    // NOTA: Se ha eliminado el error de sintaxis "const UserDashboard = ({ userName }) => {}"
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      navigate('/');
-    }
-  };
+  const displayName = userName || 'Pedro Pérez';
+  const isTransactionsActive = location.pathname === '/user/transactions';
+  const isProductsActive = location.pathname === '/user/products';
+
+  // --- Mapeo de contenido principal según la ruta ---
+  let mainContent;
+  switch (location.pathname) {
+    case '/user/transactions':
+      mainContent = <UserTransactionsView />; // Cargar componente de transacciones de usuario
+      break;
+    case '/user/products':
+      mainContent = <UserProductsView />; // Cargar componente de productos de usuario      
+      break;
+    default:
+      // Contenido de Bienvenida por defecto
+      mainContent = (
+        <div className="flex-1 p-8 flex flex-col items-center justify-center">
+          <div className="text-center mb-16">
+            <h1 className="text-6xl font-extrabold text-codecraftBlue">CodeCraft</h1>
+            <p className="text-2xl font-semibold text-gray-700 mt-2">Sistema de Gestión de Inventario</p>
+          </div>
+          <div className="text-center">
+            <h2 className="text-4xl font-bold text-slate-800 mb-4">Bienvenido {displayName}</h2>
+            <p className="text-lg text-gray-500">
+              Este sistema realiza el seguimiento de entradas y salidas <br /> del inventario en bodega.
+            </p>
+          </div>
+          <div className="absolute bottom-4 text-sm text-gray-500">
+            © Creado por Codecraft
+          </div>
+        </div>
+      );
+      break;
+  }
 
   return (
     <div className="flex w-screen h-screen bg-slate-200">
-      {/* Sidebar - Barra lateral */}
-      <div className="w-56 bg-slate-100 shadow-lg flex flex-col justify-between fixed h-full">
+      {/* Sidebar - Barra lateral (FIXED) */}
+      <div className="w-56 bg-slate-100 shadow-lg flex flex-col justify-between fixed h-full z-10">
         <div className="p-4">
           {/* User Profile - Perfil de usuario */}
           <div className="flex flex-col items-center mb-8 mt-4">
             <div className="relative group w-20 h-20 rounded-full overflow-hidden mb-2">
               {image ? (
-                <img src={image} alt="Admin Profile" className="w-full h-full object-cover" />
+                <img src={image} alt="User Profile" className="w-full h-full object-cover" />
               ) : (
                 <FaUserCircle className="text-8xl text-gray-400" />
               )}
@@ -53,54 +86,39 @@ const UserDashboard = () => {
                 />
               </label>
             </div>
-            <h2 className="text-sm font-semibold text-gray-800">Pedro Pérez</h2>
+            <h2 className="text-sm font-semibold text-gray-800">{displayName}</h2>
             <p className="text-xs text-gray-600">Almacén</p>
             <span className="text-xs text-gray-400">USUARIO</span>
           </div>
           
           {/* Navigation Buttons - Botones de navegación */}
-          <nav className="space-y-2">
-            <button className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
+          <nav className="flex flex-col space-y-2">
+            <Link 
+              to="/user/transactions" 
+              className={`w-full text-center py-2 px-4 rounded-lg transition-colors text-white ${isTransactionsActive ? 'bg-sky-600 shadow-lg' : 'bg-codecraftBlue hover:bg-sky-500'}`}
+            >
               Transacciones
-            </button>
-            <button className="w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors">
+            </Link>
+            <Link 
+              to="/user/products" 
+              className={"w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors"}
+            >
               Productos
-            </button>
-
+            </Link>
           </nav>
         </div>
         
         {/* Logout Button - Botón de cerrar sesión */}
         <div className="p-4">
-          <button
-            onClick={handleLogout}
-            className="w-full text-center mb-10 py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors"
-          >
+          <Link to="/" className="w-full text-center block mb-10 py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors">
             Cerrar Sesión
-          </button>
+          </Link>
         </div>
       </div>
       
       {/* Main Content - Contenido principal */}
-      <div className="flex-1 p-8 flex flex-col items-center justify-center ml-56">
-        {/* Header - Encabezado */}
-        <div className="text-center mb-16">
-          <h1 className="text-6xl font-extrabold text-codecraftBlue">CodeCraft</h1>
-          <p className="text-2xl font-semibold text-gray-700 mt-2">Sistema de Gestión de Inventario</p>
-        </div>
-        
-        {/* Welcome Section - Sección de bienvenida */}
-        <div className="text-center">
-          <h2 className="text-4xl font-bold text-slate-800 mb-4">Bienvenido</h2>
-          <p className="text-lg text-gray-500">
-            Este sistema realiza el seguimiento de entradas y salidas <br /> del inventario en bodega.
-          </p>
-        </div>
-        
-        {/* Footer - Pie de página */}
-        <div className="absolute bottom-4 text-sm text-gray-500">
-          © Creado por Codecraft
-        </div>
+      <div className="flex-1 overflow-y-auto ml-56"> 
+        {mainContent}
       </div>
     </div>
   );
