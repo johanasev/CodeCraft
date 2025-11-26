@@ -120,12 +120,35 @@ class Product(models.Model):
         verbose_name_plural = 'Productos'
         ordering = ['name']
 
+class Supplier(models.Model):
+    SUPPLIER_TYPES = [
+        ('Nacional', 'Nacional'),
+        ('Internacional', 'Internacional'),
+    ]
+
+    name = models.CharField(max_length=150, verbose_name='Nombre')
+    type = models.CharField(max_length=20, choices=SUPPLIER_TYPES, verbose_name='Tipo')
+    contact = models.CharField(max_length=100, verbose_name='Contacto')
+    phone = models.CharField(max_length=20, verbose_name='Teléfono')
+    email = models.EmailField(verbose_name='Correo Electrónico')
+    address = models.TextField(verbose_name='Dirección')
+    registration_date = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Registro')
+
+    def __str__(self):
+        return f"{self.name} - {self.type}"
+
+    class Meta:
+        db_table = 'suppliers'
+        verbose_name = 'Proveedor'
+        verbose_name_plural = 'Proveedores'
+        ordering = ['name']
+
 class Transaction(models.Model):
     TRANSACTION_TYPES = [
         ('entrada', 'Entrada'),
         ('salida', 'Salida'),
     ]
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='transactions')
     date = models.DateTimeField(auto_now_add=True, verbose_name='Fecha')

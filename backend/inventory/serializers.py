@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
-from .models import Role, User, Product, Transaction
+from .models import Role, User, Product, Transaction, Supplier
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -161,3 +161,32 @@ class TransactionStatsSerializer(serializers.Serializer):
     entries = serializers.IntegerField()
     exits = serializers.IntegerField()
     stock_level = serializers.IntegerField()
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supplier
+        fields = ['id', 'name', 'type', 'contact', 'phone', 'email', 'address', 'registration_date']
+        read_only_fields = ['registration_date']
+
+    def validate_email(self, value):
+        # Verificar si ya existe un proveedor con este email
+        if self.instance:
+            # En caso de actualización, excluir el registro actual
+            if Supplier.objects.filter(email=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError("Ya existe un proveedor con este email")
+        else:
+            # En caso de creación
+            if Supplier.objects.filter(email=value).exists():
+                raise serializers.ValidationError("Ya existe un proveedor con este email")
+        return value
+
+    def validate_name(self, value):
+        if len(value.strip()) < 3:
+            raise serializers.ValidationError("El nombre debe tener al menos 3 caracteres")
+        return value.strip()
+
+    def validate_phone(self, value):
+        if len(value.strip()) < 7:
+            raise serializers.ValidationError("El teléfono debe tener al menos 7 caracteres")
+        return value.strip()

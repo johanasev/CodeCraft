@@ -1,32 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaEdit, FaTrashAlt } from "react-icons/fa";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { inventoryService } from "../../api/inventoryService";
 
 
 const Proveedores = () => {
-  const [proveedores, setProveedores] = useState([
-    {
-      id: 1,
-      fechaRegistro: "2025-03-10",
-      nombre: "Distribuidora Andina",
-      tipo: "Nacional",
-      contacto: "Carlos Pérez",
-      telefono: "3001234567",
-      correo: "carlos@andina.com",
-      direccion: "Cra 45 #30-22, Medellín",
-    },
-    {
-      id: 2,
-      fechaRegistro: "2025-04-05",
-      nombre: "Importadora Global Ltda",
-      tipo: "Internacional",
-      contacto: "Anna Smith",
-      telefono: "+1 555 789 6543",
-      correo: "asmith@global.com",
-      direccion: "Miami, USA",
-    },
-  ]);
+  const [proveedores, setProveedores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Cargar proveedores del backend
+  useEffect(() => {
+    fetchProveedores();
+  }, []);
+
+  const fetchProveedores = async () => {
+    try {
+      setLoading(true);
+      const data = await inventoryService.getSuppliers();
+      setProveedores(Array.isArray(data) ? data : (data.results || []));
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching suppliers:', err);
+      setError('Error al cargar proveedores');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [filtroTexto, setFiltroTexto] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("Todos");
@@ -39,12 +40,12 @@ const Proveedores = () => {
   const [proveedorAEliminar, setProveedorAEliminar] = useState(null);
 
   const [nuevoProveedor, setNuevoProveedor] = useState({
-    nombre: "",
-    tipo: "Nacional",
-    contacto: "",
-    telefono: "",
-    correo: "",
-    direccion: "",
+    name: "",
+    type: "Nacional",
+    contact: "",
+    phone: "",
+    email: "",
+    address: "",
   });
 
 // Exportar PDF (sin errores de codificación)
@@ -60,11 +61,11 @@ const exportToPDF = () => {
 
   const tableData = proveedoresFiltrados.map((p) => [
     p.id,
-    p.nombre,
-    p.tipo,
-    p.contacto,
-    p.correo,
-    p.direccion,
+    p.name,
+    p.type,
+    p.contact,
+    p.email,
+    p.address,
   ]);
 
   autoTable(doc, {
@@ -82,10 +83,10 @@ const exportToPDF = () => {
   // 🔍 Filtros
   const proveedoresFiltrados = proveedores.filter((p) => {
     const textoCoincide =
-      p.nombre.toLowerCase().includes(filtroTexto.toLowerCase()) ||
-      p.contacto.toLowerCase().includes(filtroTexto.toLowerCase());
+      p.name.toLowerCase().includes(filtroTexto.toLowerCase()) ||
+      p.contact.toLowerCase().includes(filtroTexto.toLowerCase());
     const tipoCoincide =
-      filtroTipo === "Todos" || p.tipo === filtroTipo;
+      filtroTipo === "Todos" || p.type === filtroTipo;
     return textoCoincide && tipoCoincide;
   });
 
@@ -101,21 +102,72 @@ const exportToPDF = () => {
   };
 
   // ➕ Crear
-  const handleCreateProveedor = () => {
-    const nuevoId = proveedores.length > 0 ? proveedores[proveedores.length - 1].id + 1 : 1;
-    const fecha = new Date().toISOString().split("T")[0];
+  const handleCreateProveedor = async () => {
+    // Validaciones básicas en el frontend
+    if (!nuevoProveedor.name || nuevoProveedor.name.trim().length < 3) {
+      alert('El nombre del proveedor debe tener al menos 3 caracteres');
+      return;
+    }
 
-    const proveedor = { id: nuevoId, fechaRegistro: fecha, ...nuevoProveedor };
-    setProveedores([...proveedores, proveedor]);
-    setShowAddModal(false);
-    setNuevoProveedor({
-      nombre: "",
-      tipo: "Nacional",
-      contacto: "",
-      telefono: "",
-      correo: "",
-      direccion: "",
-    });
+    if (!nuevoProveedor.email || !nuevoProveedor.email.includes('@')) {
+      alert('Debe ingresar un email válido');
+      return;
+    }
+
+    if (!nuevoProveedor.contact || nuevoProveedor.contact.trim().length < 2) {
+      alert('Debe ingresar el nombre del contacto');
+      return;
+    }
+
+    // Verificar si el email ya existe
+    const emailExists = proveedores.some(p => p.email.toLowerCase() === nuevoProveedor.email.toLowerCase());
+    if (emailExists) {
+      alert('Ya existe un proveedor con este email. Por favor, use un email diferente.');
+      return;
+    }
+
+    try {
+      await inventoryService.createSupplier(nuevoProveedor);
+      await fetchProveedores();
+      setShowAddModal(false);
+      setNuevoProveedor({
+        name: "",
+        type: "Nacional",
+        contact: "",
+        phone: "",
+        email: "",
+        address: "",
+      });
+    } catch (err) {
+      console.error('Error creating supplier:', err);
+      const errorDetail = err.response?.data;
+      let errorMessage = 'Error al crear proveedor: ';
+
+      if (errorDetail) {
+        if (typeof errorDetail === 'string') {
+          errorMessage += errorDetail;
+        } else if (errorDetail.detail) {
+          errorMessage += errorDetail.detail;
+        } else if (errorDetail.message) {
+          errorMessage += errorDetail.message;
+        } else {
+          // Si hay errores de campo específicos
+          const fieldErrors = [];
+          Object.keys(errorDetail).forEach(field => {
+            if (Array.isArray(errorDetail[field])) {
+              fieldErrors.push(`${field}: ${errorDetail[field].join(', ')}`);
+            } else {
+              fieldErrors.push(`${field}: ${errorDetail[field]}`);
+            }
+          });
+          errorMessage += fieldErrors.join('\n');
+        }
+      } else {
+        errorMessage += err.message;
+      }
+
+      alert(errorMessage);
+    }
   };
 
   // ✏️ Editar
@@ -124,12 +176,67 @@ const exportToPDF = () => {
     setShowEditModal(true);
   };
 
-  const handleUpdateProveedor = () => {
-    setProveedores(
-      proveedores.map((p) => (p.id === proveedorAEditar.id ? proveedorAEditar : p))
+  const handleUpdateProveedor = async () => {
+    // Validaciones básicas en el frontend
+    if (!proveedorAEditar.name || proveedorAEditar.name.trim().length < 3) {
+      alert('El nombre del proveedor debe tener al menos 3 caracteres');
+      return;
+    }
+
+    if (!proveedorAEditar.email || !proveedorAEditar.email.includes('@')) {
+      alert('Debe ingresar un email válido');
+      return;
+    }
+
+    if (!proveedorAEditar.contact || proveedorAEditar.contact.trim().length < 2) {
+      alert('Debe ingresar el nombre del contacto');
+      return;
+    }
+
+    // Verificar si el email ya existe (excluyendo el proveedor actual)
+    const emailExists = proveedores.some(p =>
+      p.id !== proveedorAEditar.id &&
+      p.email.toLowerCase() === proveedorAEditar.email.toLowerCase()
     );
-    setShowEditModal(false);
-    setProveedorAEditar(null);
+    if (emailExists) {
+      alert('Ya existe otro proveedor con este email. Por favor, use un email diferente.');
+      return;
+    }
+
+    try {
+      await inventoryService.updateSupplier(proveedorAEditar.id, proveedorAEditar);
+      await fetchProveedores();
+      setShowEditModal(false);
+      setProveedorAEditar(null);
+    } catch (err) {
+      console.error('Error updating supplier:', err);
+      const errorDetail = err.response?.data;
+      let errorMessage = 'Error al actualizar proveedor: ';
+
+      if (errorDetail) {
+        if (typeof errorDetail === 'string') {
+          errorMessage += errorDetail;
+        } else if (errorDetail.detail) {
+          errorMessage += errorDetail.detail;
+        } else if (errorDetail.message) {
+          errorMessage += errorDetail.message;
+        } else {
+          const fieldErrors = [];
+          Object.keys(errorDetail).forEach(field => {
+            if (Array.isArray(errorDetail[field])) {
+              fieldErrors.push(`${field}: ${errorDetail[field].join(', ')}`);
+            } else {
+              fieldErrors.push(`${field}: ${errorDetail[field]}`);
+            }
+          });
+          errorMessage += fieldErrors.join('\n');
+        }
+      } else {
+        errorMessage += err.message;
+      }
+
+      alert(errorMessage);
+    }
   };
 
   // 🗑️ Eliminar
@@ -138,10 +245,41 @@ const exportToPDF = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    setProveedores(proveedores.filter((p) => p.id !== proveedorAEliminar.id));
-    setShowDeleteModal(false);
-    setProveedorAEliminar(null);
+  const confirmDelete = async () => {
+    try {
+      await inventoryService.deleteSupplier(proveedorAEliminar.id);
+      await fetchProveedores();
+      setShowDeleteModal(false);
+      setProveedorAEliminar(null);
+    } catch (err) {
+      console.error('Error deleting supplier:', err);
+      const errorDetail = err.response?.data;
+      let errorMessage = 'Error al eliminar proveedor: ';
+
+      if (errorDetail) {
+        if (typeof errorDetail === 'string') {
+          errorMessage += errorDetail;
+        } else if (errorDetail.detail) {
+          errorMessage += errorDetail.detail;
+        } else if (errorDetail.message) {
+          errorMessage += errorDetail.message;
+        } else {
+          const fieldErrors = [];
+          Object.keys(errorDetail).forEach(field => {
+            if (Array.isArray(errorDetail[field])) {
+              fieldErrors.push(`${field}: ${errorDetail[field].join(', ')}`);
+            } else {
+              fieldErrors.push(`${field}: ${errorDetail[field]}`);
+            }
+          });
+          errorMessage += fieldErrors.join('\n');
+        }
+      } else {
+        errorMessage += err.message;
+      }
+
+      alert(errorMessage);
+    }
   };
 
   return (
@@ -178,10 +316,24 @@ const exportToPDF = () => {
         </div>
       </div>
 
+      {/* Loading & Error States */}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-xl text-gray-600">Cargando proveedores...</div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          {error}
+        </div>
+      )}
+
       {/* 📋 Tabla de proveedores */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
+      {!loading && !error && (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
             <thead>
               <tr className="bg-gray-100">
                 {["ID", "Fecha", "Nombre", "Tipo", "Contacto", "Teléfono", "Correo", "Dirección", "Acciones"].map((col) => (
@@ -195,13 +347,13 @@ const exportToPDF = () => {
               {proveedoresFiltrados.map((p) => (
                 <tr key={p.id} className="border-b border-gray-200">
                   <td className="py-3 px-4 text-sm">{p.id}</td>
-                  <td className="py-3 px-4 text-sm">{p.fechaRegistro}</td>
-                  <td className="py-3 px-4 text-sm">{p.nombre}</td>
-                  <td className="py-3 px-4 text-sm">{p.tipo}</td>
-                  <td className="py-3 px-4 text-sm">{p.contacto}</td>
-                  <td className="py-3 px-4 text-sm">{p.telefono}</td>
-                  <td className="py-3 px-4 text-sm">{p.correo}</td>
-                  <td className="py-3 px-4 text-sm">{p.direccion}</td>
+                  <td className="py-3 px-4 text-sm">{p.registration_date ? new Date(p.registration_date).toLocaleDateString() : '-'}</td>
+                  <td className="py-3 px-4 text-sm">{p.name}</td>
+                  <td className="py-3 px-4 text-sm">{p.type}</td>
+                  <td className="py-3 px-4 text-sm">{p.contact}</td>
+                  <td className="py-3 px-4 text-sm">{p.phone}</td>
+                  <td className="py-3 px-4 text-sm">{p.email}</td>
+                  <td className="py-3 px-4 text-sm">{p.address}</td>
                   <td className="py-3 px-4 text-right">
                     <button
                       className="text-sky-600 hover:text-sky-800 mr-3"
@@ -229,27 +381,27 @@ const exportToPDF = () => {
           </table>
         </div>
       </div>
+      )}
 
-{/* 🧭 Botones de acción */}
-<div className="flex justify-between items-center mt-6 w-full">
+      {/* 🧭 Botones de acción */}
+      <div className="flex justify-between items-center mt-6 w-full">
   
-  {/* ➕ Botón agregar */}
-  <button
-    onClick={() => setShowAddModal(true)}
-    className="bg-codecraftBlue hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors"
-  >
-    Agregar Proveedor
-  </button>
+        {/* ➕ Botón agregar */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-codecraftBlue hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors"
+        >
+          Agregar Proveedor
+        </button>
 
-  {/* 📄 Botón exportar PDF */}
-  <button 
-    onClick={exportToPDF}
-    className="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-6 py-2 rounded-lg transition"
-  >
-    📄 Exportar PDF
-  </button>
-
-</div>
+        {/* 📄 Botón exportar PDF */}
+        <button
+          onClick={exportToPDF}
+          className="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-6 py-2 rounded-lg transition"
+        >
+          📄 Exportar PDF
+        </button>
+      </div>
 
 
 
@@ -282,7 +434,7 @@ const exportToPDF = () => {
             <h3 className="text-2xl font-bold mb-4 text-gray-800">Eliminar Proveedor</h3>
             <p className="text-gray-700 mb-6">
               ¿Está seguro de eliminar al proveedor{" "}
-              <strong>{proveedorAEliminar.nombre}</strong>?
+              <strong>{proveedorAEliminar.name}</strong>?
             </p>
             <div className="flex justify-center space-x-4">
               <button
@@ -312,12 +464,12 @@ const Modal = ({ title, data, onChange, onClose, onSubmit }) => (
       <h3 className="text-2xl font-bold mb-6 text-gray-800">{title}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {[
-          { label: "Nombre", name: "nombre" },
-          { label: "Tipo", name: "tipo", type: "select" },
-          { label: "Contacto", name: "contacto" },
-          { label: "Teléfono", name: "telefono" },
-          { label: "Correo Electrónico", name: "correo" },
-          { label: "Dirección", name: "direccion" },
+          { label: "Nombre", name: "name" },
+          { label: "Tipo", name: "type", type: "select" },
+          { label: "Contacto", name: "contact" },
+          { label: "Teléfono", name: "phone" },
+          { label: "Correo Electrónico", name: "email" },
+          { label: "Dirección", name: "address" },
         ].map((field) => (
           <div key={field.name}>
             <label className="block text-sm font-semibold mb-1">{field.label}</label>

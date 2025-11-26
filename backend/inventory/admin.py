@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Role, User, Product, Transaction
+from .models import Role, User, Product, Transaction, Supplier
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
@@ -23,3 +23,10 @@ class TransactionAdmin(admin.ModelAdmin):
     list_display = ('product', 'type', 'quantity', 'price', 'date', 'user')
     list_filter = ('type', 'date')
     search_fields = ('product__name', 'supplier')
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ('name', 'type', 'contact', 'phone', 'email', 'registration_date')
+    list_filter = ('type', 'registration_date')
+    search_fields = ('name', 'contact', 'email')
+    readonly_fields = ('registration_date',)

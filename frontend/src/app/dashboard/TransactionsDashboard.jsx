@@ -1,11 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 // Importamos íconos para las acciones de la tabla
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { initialTransactions, monthNames, uniqueFilters } from './mockData';
+import { inventoryService } from '../../api/inventoryService';
 
 // --- LÓGICA DEL GRÁFICO (CALCULADA) ---
+const monthNames = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
 /**
  * Toma la lista de transacciones (filtradas) y genera la data para el gráfico por mes.
  */
@@ -19,12 +24,12 @@ const generateChartData = (transactions) => {
 
   transactions.forEach(trx => {
     const date = new Date(trx.date);
-    const monthIndex = date.getMonth(); 
-    
+    const monthIndex = date.getMonth();
+
     if (monthIndex >= 0 && monthIndex < 12) {
-      if (trx.type === 'ENTRADA') {
+      if (trx.type === 'entrada') {
         monthlyDataMap[monthIndex].Ingresos += trx.quantity;
-      } else if (trx.type === 'SALIDA') {
+      } else if (trx.type === 'salida') {
         monthlyDataMap[monthIndex].Salidas += trx.quantity;
       }
     }
@@ -43,9 +48,9 @@ const getDependentFilters = (transactions, currentFilters) => {
   // 1. Crear un conjunto de transacciones que excluye el filtro del campo que estamos calculando.
   const getFilteredSet = (fieldToExclude) => {
     return transactions.filter(trx => {
-      if (fieldToExclude !== 'product' && currentFilters.product && trx.product !== currentFilters.product) return false;
-      if (fieldToExclude !== 'user' && currentFilters.user && trx.user !== currentFilters.user) return false;
-      if (fieldToExclude !== 'reference' && currentFilters.reference && trx.reference !== currentFilters.reference) return false;
+      if (fieldToExclude !== 'product' && currentFilters.product && trx.product_name !== currentFilters.product) return false;
+      if (fieldToExclude !== 'user' && currentFilters.user && trx.user_email !== currentFilters.user) return false;
+      if (fieldToExclude !== 'reference' && currentFilters.reference && trx.product_reference !== currentFilters.reference) return false;
       return true;
     });
   };
@@ -57,21 +62,23 @@ const getDependentFilters = (transactions, currentFilters) => {
 
   return {
     // Las opciones de productos disponibles son aquellas en el conjunto filtrado por usuario y referencia
-    products: Array.from(new Set(productSet.map(t => t.product))).sort(),
+    products: Array.from(new Set(productSet.map(t => t.product_name).filter(Boolean))).sort(),
     // Las opciones de usuarios disponibles son aquellas en el conjunto filtrado por producto y referencia
-    users: Array.from(new Set(userSet.map(t => t.user))).sort(),
+    users: Array.from(new Set(userSet.map(t => t.user_email).filter(Boolean))).sort(),
     // Las opciones de referencias disponibles son aquellas en el conjunto filtrado por producto y usuario
-    references: Array.from(new Set(referenceSet.map(t => t.reference))).sort(),
+    references: Array.from(new Set(referenceSet.map(t => t.product_reference).filter(Boolean))).sort(),
   };
 };
 
 const TransactionsDashboard = () => {
-  // Estado principal de todas las transacciones (la base de datos simulada)
+  // Estado principal de todas las transacciones del backend
   const navigate = useNavigate();
 
-  const [transactions, setTransactions] = useState(initialTransactions);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el modal
-  
+
   // Estado para guardar los valores de los filtros seleccionados
   const [filters, setFilters] = useState({
     product: '',
@@ -79,16 +86,35 @@ const TransactionsDashboard = () => {
     reference: '',
   });
 
+  // Cargar transacciones del backend
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true);
+      const data = await inventoryService.getTransactions();
+      setTransactions(Array.isArray(data) ? data : (data.results || []));
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setError('Error al cargar transacciones');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Calcula las opciones de filtro disponibles basándose en el estado actual de los filtros
-  const dependentFilters = useMemo(() => 
-    getDependentFilters(transactions, filters), 
+  const dependentFilters = useMemo(() =>
+    getDependentFilters(transactions, filters),
     [transactions, filters]
   );
 
   // Manejador genérico para actualizar el estado de los filtros
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Al actualizar un filtro, lo primero es aplicarlo.
     const newFilters = { ...filters, [name]: value };
 
@@ -97,7 +123,7 @@ const TransactionsDashboard = () => {
       setFilters(newFilters);
       return;
     }
-    
+
     // Si un filtro se selecciona, recalculamos las opciones disponibles.
     // Esto lo hace el useMemo de 'dependentFilters' automáticamente.
     setFilters(newFilters);
@@ -108,15 +134,15 @@ const TransactionsDashboard = () => {
   const filteredTransactions = useMemo(() => {
     return transactions.filter(trx => {
       // Filtro por Producto
-      if (filters.product && trx.product !== filters.product) {
+      if (filters.product && trx.product_name !== filters.product) {
         return false;
       }
       // Filtro por Usuario
-      if (filters.user && trx.user !== filters.user) {
+      if (filters.user && trx.user_email !== filters.user) {
         return false;
       }
       // Filtro por Referencia
-      if (filters.reference && trx.reference !== filters.reference) {
+      if (filters.reference && trx.product_reference !== filters.reference) {
         return false;
       }
       return true;
@@ -128,18 +154,18 @@ const TransactionsDashboard = () => {
 
   // Función para determinar el estilo (color) basado en el tipo de transacción
   const getTypeBadge = (type) => {
-    const isEntry = type === 'ENTRADA';
+    const isEntry = type === 'entrada';
     return (
-      <span 
-        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+      <span
+        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
           ${isEntry ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`
         }
       >
-        {type}
+        {type.toUpperCase()}
       </span>
     );
   };
-  
+
   // Handlers placeholder para las acciones de la tabla
   const handleEdit = (id) => console.log(`Editar Transacción ${id}`);
   const handleDelete = (id) => console.log(`Eliminar Transacción ${id}`);
@@ -148,15 +174,14 @@ const TransactionsDashboard = () => {
     date: '',
     product: '',
     reference: '',
-    type: 'ENTRADA',
+    type: 'entrada',
     quantity: '',
     user: '',
     observation: ''
   });
 
-
   return (
-    <div className="p-8"> 
+    <div className="p-8">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Transacciones de Inventario</h1>
@@ -165,117 +190,134 @@ const TransactionsDashboard = () => {
         </div>
       </div>
 
+      {/* Loading & Error States */}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-xl text-gray-600">Cargando transacciones...</div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          {error}
+        </div>
+      )}
+
       {/* Sección de Filtros */}
-      <div className="bg-white p-4 rounded-xl shadow-lg mb-6 flex flex-wrap gap-4">
-        {/* Filtro por Producto */}
-        <select 
-          name="product" 
-          onChange={handleFilterChange} 
-          value={filters.product}
-          className="flex-1 min-w-[150px] p-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition disabled:bg-gray-100"
-        >
-          <option value="">Filtrar por Producto</option>
-          {/* Muestra solo los productos disponibles basados en otros filtros */}
-          {dependentFilters.products.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-        
-        {/* Filtro por Usuario */}
-        <select 
-          name="user" 
-          onChange={handleFilterChange} 
-          value={filters.user}
-          className="flex-1 min-w-[150px] p-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition disabled:bg-gray-100"
-        >
-          <option value="">Filtrar por Usuario</option>
-          {/* Muestra solo los usuarios disponibles basados en otros filtros */}
-          {dependentFilters.users.map(u => (
-            <option key={u} value={u}>{u}</option>
-          ))}
-        </select>
-        
-        {/* Filtro por Referencia */}
-        <select 
-          name="reference" 
-          onChange={handleFilterChange} 
-          value={filters.reference}
-          className="flex-1 min-w-[150px] p-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition disabled:bg-gray-100"
-        >
-          <option value="">Filtrar por Referencia</option>
-          {/* Muestra solo las referencias disponibles basadas en otros filtros */}
-          {dependentFilters.references.map(r => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-      </div>
+      {!loading && !error && (
+        <div className="bg-white p-4 rounded-xl shadow-lg mb-6 flex flex-wrap gap-4">
+          {/* Filtro por Producto */}
+          <select
+            name="product"
+            onChange={handleFilterChange}
+            value={filters.product}
+            className="flex-1 min-w-[150px] p-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition disabled:bg-gray-100"
+          >
+            <option value="">Filtrar por Producto</option>
+            {/* Muestra solo los productos disponibles basados en otros filtros */}
+            {dependentFilters.products.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          {/* Filtro por Usuario */}
+          <select
+            name="user"
+            onChange={handleFilterChange}
+            value={filters.user}
+            className="flex-1 min-w-[150px] p-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition disabled:bg-gray-100"
+          >
+            <option value="">Filtrar por Usuario</option>
+            {/* Muestra solo los usuarios disponibles basados en otros filtros */}
+            {dependentFilters.users.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+
+          {/* Filtro por Referencia */}
+          <select
+            name="reference"
+            onChange={handleFilterChange}
+            value={filters.reference}
+            className="flex-1 min-w-[150px] p-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition disabled:bg-gray-100"
+          >
+            <option value="">Filtrar por Referencia</option>
+            {/* Muestra solo las referencias disponibles basadas en otros filtros */}
+            {dependentFilters.references.map(r => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Tabla de Historial de Transacciones */}
-      <div className="bg-white p-6 rounded-xl shadow-lg mb-6 overflow-x-auto">
-        <h2 className="text-xl font-semibold mb-4 text-gray-700">Historial de Transacciones ({filteredTransactions.length} resultados)</h2>
-        
-        {filteredTransactions.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            No se encontraron transacciones con los filtros aplicados.
-          </div>
-        ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Fecha</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Producto</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Referencia</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tipo Transacción</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Cantidad</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Realizado por</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Observación</th>
-                <th className="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {/* Iteramos sobre las transacciones FILTRADAS */}
-              {filteredTransactions.map((transaction) => (
-                <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
-                  {/* Alineación a la izquierda en los TD */}
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">{transaction.id}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.date}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.product}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.reference}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-left">
-                    {getTypeBadge(transaction.type)}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.quantity}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.user}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs text-left">{transaction.observation}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium flex justify-center space-x-3">
-                    {/* Acciones se mantienen centradas */}
-                    <button 
-                      onClick={() => handleEdit(transaction.id)} 
-                      title="Editar Transacción"
-                      className="text-sky-600 hover:text-sky-800 transition-colors"
-                    >
-                      <FaEdit className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(transaction.id)} 
-                      title="Eliminar Transacción"
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                    >
-                      <FaTrash className="w-5 h-5" />
-                    </button>
-                  </td>
+      {!loading && !error && (
+        <div className="bg-white p-6 rounded-xl shadow-lg mb-6 overflow-x-auto">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Historial de Transacciones ({filteredTransactions.length} resultados)</h2>
+
+          {filteredTransactions.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              No se encontraron transacciones con los filtros aplicados.
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Fecha</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Producto</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Referencia</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tipo Transacción</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Cantidad</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Realizado por</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Proveedor</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {/* Iteramos sobre las transacciones FILTRADAS */}
+                {filteredTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
+                    {/* Alineación a la izquierda en los TD */}
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">{transaction.id}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.date ? new Date(transaction.date).toLocaleDateString() : '-'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.product_name || '-'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.product_reference || '-'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-left">
+                      {getTypeBadge(transaction.type)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.quantity}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.user_email || `ID: ${transaction.user}`}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs text-left">{transaction.supplier || '-'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium flex justify-center space-x-3">
+                      {/* Acciones se mantienen centradas */}
+                      <button
+                        onClick={() => handleEdit(transaction.id)}
+                        title="Editar Transacción"
+                        className="text-sky-600 hover:text-sky-800 transition-colors"
+                      >
+                        <FaEdit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(transaction.id)}
+                        title="Eliminar Transacción"
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        <FaTrash className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {/* Botones de Acción */}
       <div className="flex justify-end space-x-4 mb-6">
         {/* Este botón abre el modal, que crearemos luego */}
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="bg-sky-600 text-white py-2 px-6 rounded-lg shadow-md hover:bg-sky-700 transition-colors font-semibold"
         >
@@ -292,7 +334,7 @@ const TransactionsDashboard = () => {
           Ver Historial
         </button>
       </div>
-      
+
       {/* Gráfico de Resumen de Movimientos (Gráfica dinámica que usa los datos FILTRADOS) */}
       <div className="bg-white p-6 rounded-xl shadow-lg">
         <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">Resumen de Movimientos por Mes</h2>
@@ -304,13 +346,13 @@ const TransactionsDashboard = () => {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={chartData} 
+                data={chartData}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis dataKey="name" stroke="#555" />
                 <YAxis stroke="#555" />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   labelStyle={{ fontWeight: 'bold' }}
                 />
@@ -322,49 +364,27 @@ const TransactionsDashboard = () => {
           )}
         </div>
       </div>
-      
+
      {/* --- MODAL PARA AGREGAR MOVIMIENTO --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg relative animate-fadeIn">
             <h2 className="text-2xl font-bold mb-4 text-gray-800">Agregar Nuevo Movimiento</h2>
-            
+
             {/* FORMULARIO */}
-            <form 
-              onSubmit={(e) => {
+            <form
+              onSubmit={async (e) => {
                 e.preventDefault();
-                // Crear nuevo objeto de transacción
-                const newTransaction = {
-                  id: generateNextId(transactions),
-                  date: formData.date || new Date().toISOString().slice(0, 10),
-                  product: formData.product,
-                  reference: formData.reference,
-                  type: formData.type,
-                  quantity: Number(formData.quantity),
-                  user: formData.user,
-                  observation: formData.observation,
-                };
-                
-                // Actualizar el estado
-                setTransactions([...transactions, newTransaction]);
+                alert('Esta funcionalidad se ha movido a la sección de Gestión de Transacciones. Use el botón "Registrar Transacción" en esa sección.');
                 setIsModalOpen(false);
-                setFormData({ // limpiar campos
-                  date: '',
-                  product: '',
-                  reference: '',
-                  type: 'ENTRADA',
-                  quantity: '',
-                  user: '',
-                  observation: ''
-                });
               }}
               className="space-y-4"
             >
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Fecha</label>
-                  <input 
-                    type="date" 
+                  <input
+                    type="date"
                     value={formData.date}
                     onChange={(e) => setFormData({...formData, date: e.target.value})}
                     className="w-full border rounded-lg p-2"
@@ -372,8 +392,8 @@ const TransactionsDashboard = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Producto</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.product}
                     onChange={(e) => setFormData({...formData, product: e.target.value})}
                     required
@@ -385,8 +405,8 @@ const TransactionsDashboard = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Referencia</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.reference}
                     onChange={(e) => setFormData({...formData, reference: e.target.value})}
                     required
@@ -395,13 +415,13 @@ const TransactionsDashboard = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Tipo</label>
-                  <select 
+                  <select
                     value={formData.type}
                     onChange={(e) => setFormData({...formData, type: e.target.value})}
                     className="w-full border rounded-lg p-2"
                   >
-                    <option value="ENTRADA">ENTRADA</option>
-                    <option value="SALIDA">SALIDA</option>
+                    <option value="entrada">ENTRADA</option>
+                    <option value="salida">SALIDA</option>
                   </select>
                 </div>
               </div>
@@ -409,8 +429,8 @@ const TransactionsDashboard = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Cantidad</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={formData.quantity}
                     onChange={(e) => setFormData({...formData, quantity: e.target.value})}
                     required
@@ -419,8 +439,8 @@ const TransactionsDashboard = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Usuario</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.user}
                     onChange={(e) => setFormData({...formData, user: e.target.value})}
                     required
@@ -431,7 +451,7 @@ const TransactionsDashboard = () => {
 
               <div>
                 <label className="block text-sm font-medium mb-1">Observación</label>
-                <textarea 
+                <textarea
                   value={formData.observation}
                   onChange={(e) => setFormData({...formData, observation: e.target.value})}
                   className="w-full border rounded-lg p-2"
@@ -439,15 +459,15 @@ const TransactionsDashboard = () => {
               </div>
 
               <div className="flex justify-end space-x-3 mt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)} 
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition"
                 >
                   Guardar Movimiento
@@ -457,10 +477,6 @@ const TransactionsDashboard = () => {
           </div>
         </div>
       )}
-
-
-
-
     </div>
   );
 };

@@ -70,6 +70,11 @@ export const inventoryService = {
     return response.data;
   },
 
+  deleteTransaction: async (id) => {
+    const response = await api.delete(`/api/transactions/${id}/`);
+    return response.data;
+  },
+
   // ============ USUARIOS ============
   getUsers: async () => {
     const response = await api.get('/api/users/');
@@ -131,6 +136,42 @@ export const inventoryService = {
 
   getCategoryDistribution: async () => {
     const response = await api.get('/charts/category-distribution/');
+    return response.data;
+  },
+
+  getTransactionTrends: async () => {
+    const response = await api.get('/charts/transaction-trends/');
+    return response.data;
+  },
+
+  getTransactionsByType: async () => {
+    const response = await api.get('/charts/transactions-by-type/');
+    return response.data;
+  },
+
+  // ============ PROVEEDORES ============
+  getSuppliers: async () => {
+    const response = await api.get('/api/suppliers/');
+    return response.data;
+  },
+
+  getSupplier: async (id) => {
+    const response = await api.get(`/api/suppliers/${id}/`);
+    return response.data;
+  },
+
+  createSupplier: async (supplierData) => {
+    const response = await api.post('/api/suppliers/', supplierData);
+    return response.data;
+  },
+
+  updateSupplier: async (id, supplierData) => {
+    const response = await api.put(`/api/suppliers/${id}/`, supplierData);
+    return response.data;
+  },
+
+  deleteSupplier: async (id) => {
+    const response = await api.delete(`/api/suppliers/${id}/`);
     return response.data;
   }
 };

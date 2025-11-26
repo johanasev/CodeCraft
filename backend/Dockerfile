@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
     pkg-config \
     netcat-openbsd \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements
@@ -31,12 +32,12 @@ COPY . .
 # Crear directorio para archivos estáticos
 RUN mkdir -p /app/staticfiles
 
+# Asegurar permisos de ejecución para entrypoint
+RUN chmod +x /app/docker-entrypoint.sh && \
+    ls -la /app/docker-entrypoint.sh
+
 # Exponer puerto
 EXPOSE 8000
 
-# Script de inicio
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
-# Comando de inicio
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Usar el entrypoint script
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

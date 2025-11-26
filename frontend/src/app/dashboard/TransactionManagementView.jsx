@@ -1,15 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaChartBar, FaChartLine } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import { inventoryService } from '../../api/inventoryService';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 
 const TransactionManagementView = () => {
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [showCharts, setShowCharts] = useState(false);
+  const [chartData, setChartData] = useState({
+    trends: [],
+    byType: [],
+    inventory: []
+  });
 
   const [newTransaction, setNewTransaction] = useState({
     product: '',
@@ -24,16 +48,25 @@ const TransactionManagementView = () => {
     fetchData();
   }, []);
 
+  // Fetch chart data when transactions change
+  useEffect(() => {
+    if (transactions.length > 0) {
+      fetchChartData();
+    }
+  }, [transactions]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [transactionsData, productsData] = await Promise.all([
+      const [transactionsData, productsData, suppliersData] = await Promise.all([
         inventoryService.getTransactions(),
-        inventoryService.getProducts()
+        inventoryService.getProducts(),
+        inventoryService.getSuppliers()
       ]);
 
       setTransactions(Array.isArray(transactionsData) ? transactionsData : (transactionsData.results || []));
       setProducts(Array.isArray(productsData) ? productsData : (productsData.results || []));
+      setSuppliers(Array.isArray(suppliersData) ? suppliersData : (suppliersData.results || []));
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -41,6 +74,62 @@ const TransactionManagementView = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchChartData = async () => {
+    try {
+      const [inventoryData] = await Promise.all([
+        inventoryService.getInventoryOverviewChart()
+      ]);
+
+      // Procesar datos para gráficas locales basadas en transacciones
+      const processedData = processTransactionData();
+
+      setChartData({
+        trends: processedData.trends,
+        byType: processedData.byType,
+        inventory: inventoryData || []
+      });
+    } catch (err) {
+      console.error('Error fetching chart data:', err);
+    }
+  };
+
+  const processTransactionData = () => {
+    if (!transactions.length) return { trends: [], byType: [] };
+
+    // Agrupar transacciones por tipo
+    const typeData = transactions.reduce((acc, transaction) => {
+      const type = transaction.type === 'entrada' ? 'Entradas' : 'Salidas';
+      if (!acc[type]) {
+        acc[type] = { name: type, count: 0, value: 0 };
+      }
+      acc[type].count += 1;
+      acc[type].value += transaction.quantity || 0;
+      return acc;
+    }, {});
+
+    // Agrupar transacciones por fecha
+    const dateData = transactions.reduce((acc, transaction) => {
+      if (!transaction.date) return acc;
+
+      const date = new Date(transaction.date).toLocaleDateString();
+      if (!acc[date]) {
+        acc[date] = { date, entradas: 0, salidas: 0 };
+      }
+
+      if (transaction.type === 'entrada') {
+        acc[date].entradas += transaction.quantity || 0;
+      } else {
+        acc[date].salidas += transaction.quantity || 0;
+      }
+      return acc;
+    }, {});
+
+    return {
+      trends: Object.values(dateData).slice(-10), // Últimos 10 días
+      byType: Object.values(typeData)
+    };
   };
 
   const handleChange = (e) => {
@@ -120,13 +209,30 @@ const TransactionManagementView = () => {
         </div>
       </div>
 
-      {/* Add Button */}
-      <button
-        onClick={() => setShowAddModal(true)}
-        className="bg-codecraftBlue hover:bg-sky-700 text-white font-bold py-2 px-4 rounded mb-6 transition-colors"
-      >
-        Registrar Transacción
-      </button>
+      {/* Action Buttons */}
+      <div className="flex gap-4 mb-6">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-codecraftBlue hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors"
+        >
+          Registrar Transacción
+        </button>
+        <button
+          onClick={() => navigate('/admin/transactions/history', {
+            state: { transactions }
+          })}
+          className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded transition-colors"
+        >
+          Ver Historial
+        </button>
+        <button
+          onClick={() => setShowCharts(!showCharts)}
+          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center gap-2"
+        >
+          <FaChartBar />
+          {showCharts ? 'Ocultar Gráficas' : 'Ver Gráficas'}
+        </button>
+      </div>
 
       {/* Loading & Error States */}
       {loading && (
@@ -138,6 +244,145 @@ const TransactionManagementView = () => {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
           {error}
+        </div>
+      )}
+
+      {/* Statistics Cards */}
+      {showCharts && !loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100 text-green-600">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Entradas</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {transactions.filter(t => t.type === 'entrada').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-red-100 text-red-600">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Salidas</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {transactions.filter(t => t.type === 'salida').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Transacciones</p>
+                <p className="text-2xl font-semibold text-gray-900">{transactions.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Cantidad Total</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {transactions.reduce((sum, t) => sum + (t.quantity || 0), 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Charts Section */}
+      {showCharts && !loading && !error && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Gráfica de Transacciones por Tipo */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h3 className="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
+              <FaChartBar className="text-blue-600" />
+              Transacciones por Tipo
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={chartData.byType}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, value }) => `${name}: ${value}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {chartData.byType.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index === 0 ? '#22c55e' : '#ef4444'} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gráfica de Tendencias */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h3 className="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
+              <FaChartLine className="text-green-600" />
+              Tendencia de Transacciones
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData.trends}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="entradas" stroke="#22c55e" strokeWidth={2} name="Entradas" />
+                <Line type="monotone" dataKey="salidas" stroke="#ef4444" strokeWidth={2} name="Salidas" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gráfica de Inventario */}
+          {chartData.inventory.length > 0 && (
+            <div className="bg-white rounded-lg shadow-lg p-6 lg:col-span-2">
+              <h3 className="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
+                <FaChartBar className="text-purple-600" />
+                Niveles de Inventario por Producto
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData.inventory}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="quantity" fill="#8b5cf6" name="Cantidad en Stock" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
 
@@ -241,13 +486,19 @@ const TransactionManagementView = () => {
 
               <div>
                 <label className="block text-sm font-semibold mb-1">Proveedor (opcional)</label>
-                <input
-                  type="text"
+                <select
                   name="supplier"
                   value={newTransaction.supplier}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
-                />
+                >
+                  <option value="">Seleccionar proveedor</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.name}>
+                      {supplier.name} - {supplier.type}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

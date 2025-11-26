@@ -9,6 +9,7 @@ router.register(r'roles', views.RoleViewSet)
 router.register(r'users', views.UserViewSet)
 router.register(r'products', views.ProductViewSet)
 router.register(r'transactions', views.TransactionViewSet)
+router.register(r'suppliers', views.SupplierViewSet)
 
 urlpatterns = [
     # Documentación API

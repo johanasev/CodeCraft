@@ -5,8 +5,8 @@ import LoginPage from './app/login/LoginPage.jsx';
 import AdminDashboard from './app/dashboard/AdminDashboard.jsx';
 import UserDashboard from './app/dashboard/UserDashboard.jsx';
 import TransactionHistory from './app/dashboard/TransactionHistory.jsx';
-import Proveedores from './app/dashboard/Suppliers.jsx';
 import Suppliers from './app/dashboard/Suppliers.jsx';
+import PrivateRoute from './components/PrivateRoute.jsx';
 // No necesitamos importar TransactionsDashboard aquí, se importa dentro de AdminDashboard
 
 function App() {

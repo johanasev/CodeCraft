@@ -7,11 +7,11 @@ from django.contrib.auth import authenticate
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Role, User, Product, Transaction
+from .models import Role, User, Product, Transaction, Supplier
 from .serializers import (
     RoleSerializer, UserSerializer, UserRegistrationSerializer, LoginSerializer,
     ProductSerializer, TransactionSerializer, ProductStatsSerializer, TransactionStatsSerializer,
-    CustomTokenObtainPairSerializer
+    CustomTokenObtainPairSerializer, SupplierSerializer
 )
 
 
@@ -312,6 +312,61 @@ def category_distribution(request):
     ).order_by('-count')
     
     return Response(categories)
+
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    """ViewSet para gestión de proveedores"""
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Supplier.objects.all()
+
+        # Filtros opcionales
+        supplier_type = self.request.query_params.get('type', None)
+        search = self.request.query_params.get('search', None)
+
+        if supplier_type and supplier_type != 'Todos':
+            queryset = queryset.filter(type=supplier_type)
+
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(contact__icontains=search) |
+                Q(email__icontains=search)
+            )
+
+        return queryset.order_by('name')
+
+    @action(detail=False, methods=['get'])
+    def by_type(self, request):
+        """Obtener proveedores agrupados por tipo"""
+        supplier_type = request.query_params.get('type', None)
+        if supplier_type:
+            suppliers = Supplier.objects.filter(type=supplier_type)
+        else:
+            suppliers = Supplier.objects.all()
+        serializer = self.get_serializer(suppliers, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Obtener estadísticas de proveedores"""
+        total_suppliers = Supplier.objects.count()
+        national_count = Supplier.objects.filter(type='Nacional').count()
+        international_count = Supplier.objects.filter(type='Internacional').count()
+
+        stats = {
+            'total_suppliers': total_suppliers,
+            'national_count': national_count,
+            'international_count': international_count,
+            'recent_suppliers': SupplierSerializer(
+                Supplier.objects.order_by('-registration_date')[:5], many=True
+            ).data
+        }
+
+        return Response(stats)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):

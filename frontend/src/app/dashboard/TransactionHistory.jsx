@@ -23,8 +23,8 @@ const TransactionHistory = () => {
         if (startDate && trxDate < new Date(startDate)) return false;
         if (endDate && trxDate > new Date(endDate)) return false;
         if (type && trx.type !== type) return false;
-        if (category && trx.category !== category) return false;
-        if (user && trx.user !== user) return false;
+        if (category && trx.product_name && !trx.product_name.toLowerCase().includes(category.toLowerCase())) return false;
+        if (user && trx.user_email && !trx.user_email.toLowerCase().includes(user.toLowerCase())) return false;
         return true;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -45,13 +45,13 @@ const TransactionHistory = () => {
 
     const tableData = filteredTransactions.map((trx) => [
       trx.id,
-      trx.date,
-      trx.category || "-",
-      trx.reference,
-      trx.type,
+      new Date(trx.date).toLocaleDateString(),
+      trx.product_name || "-",
+      trx.product_reference || "-",
+      trx.type.toUpperCase(),
       trx.quantity,
-      trx.user,
-      trx.observation || "-",
+      trx.user_email || `ID: ${trx.user}`,
+      trx.supplier || "-",
     ]);
 
     autoTable(doc,{
@@ -59,12 +59,12 @@ const TransactionHistory = () => {
         [
           "ID",
           "Fecha",
-          "Categoría",
+          "Producto",
           "Referencia",
           "Tipo",
           "Cantidad",
           "Usuario",
-          "Observación",
+          "Proveedor",
         ],
       ],
       body: tableData,
@@ -113,13 +113,13 @@ const TransactionHistory = () => {
           <label className="block text-sm font-medium mb-1">Tipo</label>
           <select className="w-full border p-2 rounded-lg" value={type} onChange={(e) => setType(e.target.value)}>
             <option value="">Todos</option>
-            <option value="ENTRADA">Entrada</option>
-            <option value="SALIDA">Salida</option>
+            <option value="entrada">Entrada</option>
+            <option value="salida">Salida</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Categoría</label>
-          <input type="text" className="w-full border p-2 rounded-lg" placeholder="Buscar categoría" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <label className="block text-sm font-medium mb-1">Producto</label>
+          <input type="text" className="w-full border p-2 rounded-lg" placeholder="Buscar producto" value={category} onChange={(e) => setCategory(e.target.value)} />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Usuario</label>
@@ -139,25 +139,25 @@ const TransactionHistory = () => {
               <tr>
                 <th className="px-4 py-2 text-left">ID</th>
                 <th className="px-4 py-2 text-left">Fecha</th>
-                <th className="px-4 py-2 text-left">Categoría</th>
+                <th className="px-4 py-2 text-left">Producto</th>
                 <th className="px-4 py-2 text-left">Referencia</th>
                 <th className="px-4 py-2 text-left">Tipo</th>
                 <th className="px-4 py-2 text-left">Cantidad</th>
                 <th className="px-4 py-2 text-left">Usuario</th>
-                <th className="px-4 py-2 text-left">Observación</th>
+                <th className="px-4 py-2 text-left">Proveedor</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredTransactions.map((trx) => (
                 <tr key={trx.id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-2">{trx.id}</td>
-                  <td className="px-4 py-2">{trx.date}</td>
-                  <td className="px-4 py-2">{trx.category || "-"}</td>
-                  <td className="px-4 py-2">{trx.reference}</td>
-                  <td className="px-4 py-2">{trx.type}</td>
+                  <td className="px-4 py-2">{trx.date ? new Date(trx.date).toLocaleDateString() : '-'}</td>
+                  <td className="px-4 py-2">{trx.product_name || "-"}</td>
+                  <td className="px-4 py-2">{trx.product_reference || "-"}</td>
+                  <td className="px-4 py-2">{trx.type ? trx.type.toUpperCase() : "-"}</td>
                   <td className="px-4 py-2">{trx.quantity}</td>
-                  <td className="px-4 py-2">{trx.user}</td>
-                  <td className="px-4 py-2">{trx.observation || "-"}</td>
+                  <td className="px-4 py-2">{trx.user_email || `ID: ${trx.user}`}</td>
+                  <td className="px-4 py-2">{trx.supplier || "-"}</td>
                 </tr>
               ))}
             </tbody>
