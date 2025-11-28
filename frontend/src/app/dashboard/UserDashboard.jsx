@@ -37,6 +37,9 @@ const UserDashboard = ({ userName }) => {
   const isTransactionsActive = location.pathname === '/user/transactions';
   const isProductsActive = location.pathname === '/user/products';
 
+  // Debug: mostrar información del usuario en consola
+  console.log('UserDashboard - User info:', { displayName, userRole, userDepartment, user });
+
   // --- Mapeo de contenido principal según la ruta ---
   let mainContent;
   switch (location.pathname) {
@@ -107,7 +110,7 @@ const UserDashboard = ({ userName }) => {
             </Link>
             <Link
               to="/user/products"
-              className={"w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors"}
+              className={`w-full text-center py-2 px-4 rounded-lg transition-colors text-white ${isProductsActive ? 'bg-sky-600 shadow-lg' : 'bg-codecraftBlue hover:bg-sky-500'}`}
             >
               Productos
             </Link>

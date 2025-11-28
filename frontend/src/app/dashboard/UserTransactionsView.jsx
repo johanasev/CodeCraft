@@ -38,7 +38,7 @@ const generateChartData = (transactions) => {
   transactions.forEach(trx => {
     const date = new Date(trx.date);
     const monthIndex = date.getMonth();
-    const transactionType = trx.transaction_type || trx.type;
+    const transactionType = (trx.transaction_type || trx.type || '').toUpperCase();
 
     if (monthIndex >= 0 && monthIndex < 12) {
       if (transactionType === 'ENTRADA') {

@@ -92,6 +92,7 @@ const UserManagementView = () => {
     } catch (err) {
       console.error('Error creating user:', err);
       alert('❌ Error al crear usuario: ' + (err.response?.data?.detail || 'Error desconocido'));
+      return; // Detener ejecución si hay error
     }
   };
 
