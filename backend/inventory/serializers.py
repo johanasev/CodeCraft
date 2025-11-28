@@ -96,10 +96,14 @@ class LoginSerializer(serializers.Serializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    is_low_stock = serializers.ReadOnlyField()
+    category = serializers.CharField(source='type', read_only=True)
+
     class Meta:
         model = Product
-        fields = ['id', 'name', 'type', 'quantity', 'description', 'size', 
-                 'reference', 'price']
+        fields = ['id', 'name', 'type', 'category', 'quantity', 'description', 'size',
+                 'reference', 'price', 'minimum_stock', 'is_active', 'created_at', 'is_low_stock']
+        read_only_fields = ['created_at', 'is_low_stock']
 
     def validate_quantity(self, value):
         if value < 0:
@@ -109,6 +113,11 @@ class ProductSerializer(serializers.ModelSerializer):
     def validate_price(self, value):
         if value <= 0:
             raise serializers.ValidationError("El precio debe ser mayor a 0")
+        return value
+
+    def validate_minimum_stock(self, value):
+        if value < 0:
+            raise serializers.ValidationError("El stock mínimo no puede ser negativo")
         return value
 
 
@@ -166,7 +175,7 @@ class TransactionStatsSerializer(serializers.Serializer):
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
-        fields = ['id', 'name', 'type', 'contact', 'phone', 'email', 'address', 'registration_date']
+        fields = ['id', 'name', 'type', 'contact', 'phone', 'email', 'address', 'registration_date', 'is_active']
         read_only_fields = ['registration_date']
 
     def validate_email(self, value):

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { FaEdit, FaTrashAlt } from "react-icons/fa";
+import React, { useState, useEffect, useMemo } from "react";
+import { FaEdit, FaTrashAlt, FaExclamationTriangle } from "react-icons/fa";
 import { inventoryService } from "../../api/inventoryService";
 
 const ProductManagementView = () => {
@@ -13,6 +13,13 @@ const ProductManagementView = () => {
   const [productToDelete, setProductToDelete] = useState(null);
   const [productToEdit, setProductToEdit] = useState(null);
 
+  const [filters, setFilters] = useState({
+    name: '',
+    type: '',
+    reference: '',
+    estado: 'Todos'
+  });
+
   const [newProduct, setNewProduct] = useState({
     name: "",
     type: "",
@@ -21,6 +28,7 @@ const ProductManagementView = () => {
     description: "",
     price: "",
     quantity: "",
+    minimum_stock: "10",
   });
 
   // Fetch products on component mount
@@ -57,6 +65,7 @@ const ProductManagementView = () => {
         description: newProduct.description,
         price: parseFloat(newProduct.price),
         quantity: parseInt(newProduct.quantity),
+        minimum_stock: parseInt(newProduct.minimum_stock) || 10,
       };
 
       await inventoryService.createProduct(productData);
@@ -70,6 +79,7 @@ const ProductManagementView = () => {
         description: "",
         price: "",
         quantity: "",
+        minimum_stock: "10",
       });
     } catch (err) {
       console.error('Error creating product:', err);
@@ -114,6 +124,7 @@ const ProductManagementView = () => {
         description: productToEdit.description,
         price: parseFloat(productToEdit.price),
         quantity: parseInt(productToEdit.quantity),
+        minimum_stock: parseInt(productToEdit.minimum_stock) || 10,
       };
 
       await inventoryService.updateProduct(productToEdit.id, productData);
@@ -126,16 +137,87 @@ const ProductManagementView = () => {
     }
   };
 
+  // Obtener tipos/categorías únicos para el filtro
+  const productTypes = useMemo(() => {
+    const uniqueTypes = Array.from(new Set(products.map(p => p.type).filter(Boolean)));
+    return uniqueTypes.sort();
+  }, [products]);
+
+  // Filtrar productos
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const isLowStock = product.is_low_stock || (product.quantity <= (product.minimum_stock || 10));
+
+      if (filters.name && !product.name.toLowerCase().includes(filters.name.toLowerCase())) return false;
+      if (filters.type && product.type !== filters.type) return false;
+      if (filters.reference && !product.reference.toLowerCase().includes(filters.reference.toLowerCase())) return false;
+      if (filters.estado === 'Stock Bajo' && !isLowStock) return false;
+      if (filters.estado === 'Normal' && isLowStock) return false;
+
+      return true;
+    });
+  }, [products, filters]);
+
   return (
     <div className="min-h-screen p-8 bg-slate-200">
       {/* 🧑‍💻 Encabezado */}
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-4xl font-bold text-gray-800">Gestión de Productos</h2>
+        <h2 className="text-4xl font-bold text-gray-800">
+          Gestión de Productos {!loading && `(${filteredProducts.length} productos)`}
+        </h2>
         <div className="flex items-center text-sm font-semibold text-gray-600">
           <span>Sistema de Gestión de Inventarios</span>
           <span className="text-sky-600 ml-1">CodeCraft</span>
         </div>
       </div>
+
+      {/* Sección de Filtros */}
+      {!loading && !error && (
+        <div className="bg-white p-4 rounded-lg shadow-lg mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Filtro por Nombre */}
+            <input
+              type="text"
+              placeholder="Buscar por nombre..."
+              value={filters.name}
+              onChange={(e) => setFilters({...filters, name: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            />
+
+            {/* Filtro por Categoría */}
+            <select
+              value={filters.type}
+              onChange={(e) => setFilters({...filters, type: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            >
+              <option value="">Todas las categorías</option>
+              {productTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+
+            {/* Filtro por Referencia */}
+            <input
+              type="text"
+              placeholder="Buscar por referencia..."
+              value={filters.reference}
+              onChange={(e) => setFilters({...filters, reference: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            />
+
+            {/* Filtro por Estado */}
+            <select
+              value={filters.estado}
+              onChange={(e) => setFilters({...filters, estado: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Stock Bajo">Stock Bajo</option>
+              <option value="Normal">Stock Normal</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* ➕ Botón agregar */}
       <button
@@ -173,7 +255,9 @@ const ProductManagementView = () => {
                   "Talla",
                   "Descripción",
                   "Precio",
+                  "Stock Mínimo",
                   "Cantidad",
+                  "Estado",
                   "Acciones",
                 ].map((col) => (
                   <th
@@ -188,32 +272,54 @@ const ProductManagementView = () => {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
-                <tr key={product.id} className="border-b border-gray-200">
-                  <td className="py-4 px-4 text-sm">{product.id}</td>
-                  <td className="py-4 px-4 text-sm">{product.name}</td>
-                  <td className="py-4 px-4 text-sm">{product.type}</td>
-                  <td className="py-4 px-4 text-sm">{product.reference}</td>
-                  <td className="py-4 px-4 text-sm">{product.size}</td>
-                  <td className="py-4 px-4 text-sm">{product.description}</td>
-                  <td className="py-4 px-4 text-sm">${parseFloat(product.price).toLocaleString()}</td>
-                  <td className="py-4 px-4 text-sm">{product.quantity}</td>
-                  <td className="py-4 px-4 text-right">
-                    <button
-                      className="text-sky-600 hover:text-sky-800 mr-3"
-                      onClick={() => handleEdit(product)}
-                    >
-                      <FaEdit className="inline text-lg" />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-800"
-                      onClick={() => handleDelete(product)}
-                    >
-                      <FaTrashAlt className="inline text-lg" />
-                    </button>
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan="11" className="text-center py-6 text-gray-500">
+                    No se encontraron productos con los filtros aplicados
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredProducts.map((product) => {
+                  const isLowStock = product.is_low_stock || (product.quantity <= (product.minimum_stock || 10));
+                  return (
+                  <tr key={product.id} className={`border-b border-gray-200 ${isLowStock ? 'bg-red-50' : ''}`}>
+                    <td className="py-4 px-4 text-sm">{product.id}</td>
+                    <td className="py-4 px-4 text-sm">{product.name}</td>
+                    <td className="py-4 px-4 text-sm">{product.type}</td>
+                    <td className="py-4 px-4 text-sm">{product.reference}</td>
+                    <td className="py-4 px-4 text-sm">{product.size}</td>
+                    <td className="py-4 px-4 text-sm">{product.description}</td>
+                    <td className="py-4 px-4 text-sm">${parseFloat(product.price).toLocaleString()}</td>
+                    <td className="py-4 px-4 text-sm">{product.minimum_stock || 10}</td>
+                    <td className={`py-4 px-4 text-sm font-medium ${isLowStock ? 'text-red-600 font-bold' : ''}`}>
+                      {product.quantity}
+                    </td>
+                    <td className="py-4 px-4 text-sm">
+                      {isLowStock && (
+                        <div className="flex items-center gap-1 text-red-600">
+                          <FaExclamationTriangle />
+                          <span className="font-semibold text-xs">Stock Bajo</span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <button
+                        className="text-sky-600 hover:text-sky-800 mr-3"
+                        onClick={() => handleEdit(product)}
+                      >
+                        <FaEdit className="inline text-lg" />
+                      </button>
+                      <button
+                        className="text-red-600 hover:text-red-800"
+                        onClick={() => handleDelete(product)}
+                      >
+                        <FaTrashAlt className="inline text-lg" />
+                      </button>
+                    </td>
+                  </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -301,6 +407,17 @@ const ProductManagementView = () => {
                   type="number"
                   name="quantity"
                   value={newProduct.quantity}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Stock Mínimo</label>
+                <input
+                  type="number"
+                  name="minimum_stock"
+                  value={newProduct.minimum_stock}
                   onChange={handleChange}
                   min="0"
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
@@ -416,6 +533,17 @@ const ProductManagementView = () => {
                   type="number"
                   name="quantity"
                   value={productToEdit.quantity}
+                  onChange={handleEditChange}
+                  min="0"
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Stock Mínimo</label>
+                <input
+                  type="number"
+                  name="minimum_stock"
+                  value={productToEdit.minimum_stock || 10}
                   onChange={handleEditChange}
                   min="0"
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"

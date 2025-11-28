@@ -31,6 +31,7 @@ const Proveedores = () => {
 
   const [filtroTexto, setFiltroTexto] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("Todos");
+  const [filtroEstado, setFiltroEstado] = useState("Todos");
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -87,7 +88,11 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
       p.contact.toLowerCase().includes(filtroTexto.toLowerCase());
     const tipoCoincide =
       filtroTipo === "Todos" || p.type === filtroTipo;
-    return textoCoincide && tipoCoincide;
+    const estadoCoincide =
+      filtroEstado === "Todos" ||
+      (filtroEstado === "Activos" && p.is_active) ||
+      (filtroEstado === "Inactivos" && !p.is_active);
+    return textoCoincide && tipoCoincide && estadoCoincide;
   });
 
   // 🧩 Manejo de cambios
@@ -103,26 +108,40 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
 
   // ➕ Crear
   const handleCreateProveedor = async () => {
-    // Validaciones básicas en el frontend
+    // Validaciones mejoradas en el frontend
+    const errors = [];
+
     if (!nuevoProveedor.name || nuevoProveedor.name.trim().length < 3) {
-      alert('El nombre del proveedor debe tener al menos 3 caracteres');
-      return;
+      errors.push('• El nombre del proveedor es obligatorio y debe tener al menos 3 caracteres');
     }
 
-    if (!nuevoProveedor.email || !nuevoProveedor.email.includes('@')) {
-      alert('Debe ingresar un email válido');
-      return;
+    if (!nuevoProveedor.email || nuevoProveedor.email.trim() === '') {
+      errors.push('• El email es obligatorio');
+    } else if (!nuevoProveedor.email.includes('@') || !nuevoProveedor.email.includes('.')) {
+      errors.push('• El email debe tener un formato válido (ejemplo@dominio.com)');
     }
 
     if (!nuevoProveedor.contact || nuevoProveedor.contact.trim().length < 2) {
-      alert('Debe ingresar el nombre del contacto');
+      errors.push('• El nombre del contacto es obligatorio y debe tener al menos 2 caracteres');
+    }
+
+    if (!nuevoProveedor.phone || nuevoProveedor.phone.trim().length < 7) {
+      errors.push('• El teléfono es obligatorio y debe tener al menos 7 dígitos');
+    }
+
+    if (!nuevoProveedor.address || nuevoProveedor.address.trim().length < 10) {
+      errors.push('• La dirección es obligatoria y debe ser más específica (mínimo 10 caracteres)');
+    }
+
+    if (errors.length > 0) {
+      alert('Por favor corrija los siguientes errores:\n\n' + errors.join('\n'));
       return;
     }
 
     // Verificar si el email ya existe
     const emailExists = proveedores.some(p => p.email.toLowerCase() === nuevoProveedor.email.toLowerCase());
     if (emailExists) {
-      alert('Ya existe un proveedor con este email. Por favor, use un email diferente.');
+      alert('❌ Error: Ya existe un proveedor registrado con este email.\nPor favor, use un email diferente.');
       return;
     }
 
@@ -141,29 +160,41 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
     } catch (err) {
       console.error('Error creating supplier:', err);
       const errorDetail = err.response?.data;
-      let errorMessage = 'Error al crear proveedor: ';
+      let errorMessage = '❌ Error al crear el proveedor:\n\n';
 
       if (errorDetail) {
         if (typeof errorDetail === 'string') {
-          errorMessage += errorDetail;
+          errorMessage += `• ${errorDetail}`;
         } else if (errorDetail.detail) {
-          errorMessage += errorDetail.detail;
+          errorMessage += `• ${errorDetail.detail}`;
         } else if (errorDetail.message) {
-          errorMessage += errorDetail.message;
+          errorMessage += `• ${errorDetail.message}`;
         } else {
-          // Si hay errores de campo específicos
+          // Si hay errores de campo específicos del servidor
           const fieldErrors = [];
+          const fieldNames = {
+            name: 'Nombre',
+            email: 'Email',
+            contact: 'Contacto',
+            phone: 'Teléfono',
+            address: 'Dirección',
+            type: 'Tipo'
+          };
+
           Object.keys(errorDetail).forEach(field => {
+            const friendlyFieldName = fieldNames[field] || field;
             if (Array.isArray(errorDetail[field])) {
-              fieldErrors.push(`${field}: ${errorDetail[field].join(', ')}`);
+              fieldErrors.push(`• ${friendlyFieldName}: ${errorDetail[field].join(', ')}`);
             } else {
-              fieldErrors.push(`${field}: ${errorDetail[field]}`);
+              fieldErrors.push(`• ${friendlyFieldName}: ${errorDetail[field]}`);
             }
           });
           errorMessage += fieldErrors.join('\n');
         }
+      } else if (err.code === 'NETWORK_ERROR') {
+        errorMessage += '• No se pudo conectar con el servidor. Verifique su conexión a internet.';
       } else {
-        errorMessage += err.message;
+        errorMessage += `• ${err.message || 'Error desconocido del servidor'}`;
       }
 
       alert(errorMessage);
@@ -177,19 +208,33 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
   };
 
   const handleUpdateProveedor = async () => {
-    // Validaciones básicas en el frontend
+    // Validaciones mejoradas en el frontend
+    const errors = [];
+
     if (!proveedorAEditar.name || proveedorAEditar.name.trim().length < 3) {
-      alert('El nombre del proveedor debe tener al menos 3 caracteres');
-      return;
+      errors.push('• El nombre del proveedor es obligatorio y debe tener al menos 3 caracteres');
     }
 
-    if (!proveedorAEditar.email || !proveedorAEditar.email.includes('@')) {
-      alert('Debe ingresar un email válido');
-      return;
+    if (!proveedorAEditar.email || proveedorAEditar.email.trim() === '') {
+      errors.push('• El email es obligatorio');
+    } else if (!proveedorAEditar.email.includes('@') || !proveedorAEditar.email.includes('.')) {
+      errors.push('• El email debe tener un formato válido (ejemplo@dominio.com)');
     }
 
     if (!proveedorAEditar.contact || proveedorAEditar.contact.trim().length < 2) {
-      alert('Debe ingresar el nombre del contacto');
+      errors.push('• El nombre del contacto es obligatorio y debe tener al menos 2 caracteres');
+    }
+
+    if (!proveedorAEditar.phone || proveedorAEditar.phone.trim().length < 7) {
+      errors.push('• El teléfono es obligatorio y debe tener al menos 7 dígitos');
+    }
+
+    if (!proveedorAEditar.address || proveedorAEditar.address.trim().length < 10) {
+      errors.push('• La dirección es obligatoria y debe ser más específica (mínimo 10 caracteres)');
+    }
+
+    if (errors.length > 0) {
+      alert('Por favor corrija los siguientes errores:\n\n' + errors.join('\n'));
       return;
     }
 
@@ -199,7 +244,7 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
       p.email.toLowerCase() === proveedorAEditar.email.toLowerCase()
     );
     if (emailExists) {
-      alert('Ya existe otro proveedor con este email. Por favor, use un email diferente.');
+      alert('❌ Error: Ya existe otro proveedor registrado con este email.\nPor favor, use un email diferente.');
       return;
     }
 
@@ -211,28 +256,40 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
     } catch (err) {
       console.error('Error updating supplier:', err);
       const errorDetail = err.response?.data;
-      let errorMessage = 'Error al actualizar proveedor: ';
+      let errorMessage = '❌ Error al actualizar el proveedor:\n\n';
 
       if (errorDetail) {
         if (typeof errorDetail === 'string') {
-          errorMessage += errorDetail;
+          errorMessage += `• ${errorDetail}`;
         } else if (errorDetail.detail) {
-          errorMessage += errorDetail.detail;
+          errorMessage += `• ${errorDetail.detail}`;
         } else if (errorDetail.message) {
-          errorMessage += errorDetail.message;
+          errorMessage += `• ${errorDetail.message}`;
         } else {
           const fieldErrors = [];
+          const fieldNames = {
+            name: 'Nombre',
+            email: 'Email',
+            contact: 'Contacto',
+            phone: 'Teléfono',
+            address: 'Dirección',
+            type: 'Tipo'
+          };
+
           Object.keys(errorDetail).forEach(field => {
+            const friendlyFieldName = fieldNames[field] || field;
             if (Array.isArray(errorDetail[field])) {
-              fieldErrors.push(`${field}: ${errorDetail[field].join(', ')}`);
+              fieldErrors.push(`• ${friendlyFieldName}: ${errorDetail[field].join(', ')}`);
             } else {
-              fieldErrors.push(`${field}: ${errorDetail[field]}`);
+              fieldErrors.push(`• ${friendlyFieldName}: ${errorDetail[field]}`);
             }
           });
           errorMessage += fieldErrors.join('\n');
         }
+      } else if (err.code === 'NETWORK_ERROR') {
+        errorMessage += '• No se pudo conectar con el servidor. Verifique su conexión a internet.';
       } else {
-        errorMessage += err.message;
+        errorMessage += `• ${err.message || 'Error desconocido del servidor'}`;
       }
 
       alert(errorMessage);
@@ -251,34 +308,68 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
       await fetchProveedores();
       setShowDeleteModal(false);
       setProveedorAEliminar(null);
+      alert('✅ Proveedor eliminado exitosamente');
     } catch (err) {
       console.error('Error deleting supplier:', err);
       const errorDetail = err.response?.data;
-      let errorMessage = 'Error al eliminar proveedor: ';
 
+      // Si el backend indica que se puede desactivar, mostrar opción
+      if (errorDetail?.can_deactivate) {
+        const userConfirm = window.confirm(
+          `⚠️ ${errorDetail.error}\n\n${errorDetail.detail}\n\n¿Desea inactivar el proveedor en lugar de eliminarlo?\n\nPresione OK para inactivar, o Cancelar para volver.`
+        );
+
+        if (userConfirm) {
+          try {
+            await inventoryService.deactivateSupplier(proveedorAEliminar.id);
+            await fetchProveedores();
+            setShowDeleteModal(false);
+            setProveedorAEliminar(null);
+            alert('✅ Proveedor inactivado exitosamente');
+          } catch (deactivateErr) {
+            alert(`❌ Error al inactivar el proveedor: ${deactivateErr.message}`);
+          }
+        }
+        return;
+      }
+
+      // Error genérico
+      let errorMessage = '❌ Error al eliminar el proveedor:\n\n';
       if (errorDetail) {
         if (typeof errorDetail === 'string') {
-          errorMessage += errorDetail;
+          errorMessage += `• ${errorDetail}`;
         } else if (errorDetail.detail) {
-          errorMessage += errorDetail.detail;
-        } else if (errorDetail.message) {
-          errorMessage += errorDetail.message;
+          errorMessage += `• ${errorDetail.detail}`;
+        } else if (errorDetail.error) {
+          errorMessage += `• ${errorDetail.error}`;
         } else {
-          const fieldErrors = [];
-          Object.keys(errorDetail).forEach(field => {
-            if (Array.isArray(errorDetail[field])) {
-              fieldErrors.push(`${field}: ${errorDetail[field].join(', ')}`);
-            } else {
-              fieldErrors.push(`${field}: ${errorDetail[field]}`);
-            }
-          });
-          errorMessage += fieldErrors.join('\n');
+          errorMessage += '• No se pudo completar la operación';
         }
       } else {
-        errorMessage += err.message;
+        errorMessage += `• ${err.message || 'Error desconocido'}`;
       }
 
       alert(errorMessage);
+    }
+  };
+
+  // Activar/Desactivar proveedor
+  const handleToggleActive = async (proveedor) => {
+    const action = proveedor.is_active ? 'inactivar' : 'activar';
+    const confirm = window.confirm(`¿Está seguro de ${action} el proveedor "${proveedor.name}"?`);
+
+    if (confirm) {
+      try {
+        if (proveedor.is_active) {
+          await inventoryService.deactivateSupplier(proveedor.id);
+        } else {
+          await inventoryService.activateSupplier(proveedor.id);
+        }
+        await fetchProveedores();
+        alert(`✅ Proveedor ${action === 'inactivar' ? 'inactivado' : 'activado'} exitosamente`);
+      } catch (err) {
+        alert(`❌ Error al ${action} el proveedor: ${err.message}`);
+      }
     }
   };
 
@@ -296,7 +387,7 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
       {/* 🔍 Filtros */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h3 className="text-xl font-semibold mb-4 text-gray-800">Filtros de búsqueda</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
             placeholder="Buscar por nombre o contacto..."
@@ -309,9 +400,18 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
             onChange={(e) => setFiltroTipo(e.target.value)}
             className="border border-gray-300 rounded px-3 py-2 w-full focus:ring focus:ring-sky-200"
           >
-            <option value="Todos">Todos</option>
+            <option value="Todos">Todos los tipos</option>
             <option value="Nacional">Nacional</option>
             <option value="Internacional">Internacional</option>
+          </select>
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-2 w-full focus:ring focus:ring-sky-200"
+          >
+            <option value="Todos">Todos los estados</option>
+            <option value="Activos">Activos</option>
+            <option value="Inactivos">Inactivos</option>
           </select>
         </div>
       </div>
@@ -336,7 +436,7 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
             <table className="min-w-full">
             <thead>
               <tr className="bg-gray-100">
-                {["ID", "Fecha", "Nombre", "Tipo", "Contacto", "Teléfono", "Correo", "Dirección", "Acciones"].map((col) => (
+                {["ID", "Fecha", "Nombre", "Tipo", "Contacto", "Teléfono", "Correo", "Dirección", "Estado", "Acciones"].map((col) => (
                   <th key={col} className="py-3 px-4 text-left text-sm font-semibold text-gray-600">
                     {col}
                   </th>
@@ -345,7 +445,7 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
             </thead>
             <tbody>
               {proveedoresFiltrados.map((p) => (
-                <tr key={p.id} className="border-b border-gray-200">
+                <tr key={p.id} className={`border-b border-gray-200 ${!p.is_active ? 'bg-gray-100 opacity-60' : ''}`}>
                   <td className="py-3 px-4 text-sm">{p.id}</td>
                   <td className="py-3 px-4 text-sm">{p.registration_date ? new Date(p.registration_date).toLocaleDateString() : '-'}</td>
                   <td className="py-3 px-4 text-sm">{p.name}</td>
@@ -354,16 +454,30 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
                   <td className="py-3 px-4 text-sm">{p.phone}</td>
                   <td className="py-3 px-4 text-sm">{p.email}</td>
                   <td className="py-3 px-4 text-sm">{p.address}</td>
+                  <td className="py-3 px-4 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {p.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
                   <td className="py-3 px-4 text-right">
                     <button
                       className="text-sky-600 hover:text-sky-800 mr-3"
                       onClick={() => handleEdit(p)}
+                      title="Editar"
                     >
                       <FaEdit className="inline text-lg" />
                     </button>
                     <button
+                      className={`mr-3 ${p.is_active ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'}`}
+                      onClick={() => handleToggleActive(p)}
+                      title={p.is_active ? 'Inactivar' : 'Activar'}
+                    >
+                      {p.is_active ? '🔒' : '✅'}
+                    </button>
+                    <button
                       className="text-red-600 hover:text-red-800"
                       onClick={() => handleDelete(p)}
+                      title="Eliminar"
                     >
                       <FaTrashAlt className="inline text-lg" />
                     </button>
@@ -372,7 +486,7 @@ doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 36);
               ))}
               {proveedoresFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="text-center py-6 text-gray-500">
+                  <td colSpan="10" className="text-center py-6 text-gray-500">
                     No se encontraron proveedores
                   </td>
                 </tr>
@@ -464,20 +578,24 @@ const Modal = ({ title, data, onChange, onClose, onSubmit }) => (
       <h3 className="text-2xl font-bold mb-6 text-gray-800">{title}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {[
-          { label: "Nombre", name: "name" },
-          { label: "Tipo", name: "type", type: "select" },
-          { label: "Contacto", name: "contact" },
-          { label: "Teléfono", name: "phone" },
-          { label: "Correo Electrónico", name: "email" },
-          { label: "Dirección", name: "address" },
+          { label: "Nombre", name: "name", required: true },
+          { label: "Tipo", name: "type", type: "select", required: true },
+          { label: "Contacto", name: "contact", required: true },
+          { label: "Teléfono", name: "phone", required: true },
+          { label: "Correo Electrónico", name: "email", required: true },
+          { label: "Dirección", name: "address", required: true },
         ].map((field) => (
           <div key={field.name}>
-            <label className="block text-sm font-semibold mb-1">{field.label}</label>
+            <label className="block text-sm font-semibold mb-1">
+              {field.label}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
             {field.type === "select" ? (
               <select
                 name={field.name}
                 value={data[field.name]}
                 onChange={onChange}
+                required={field.required}
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:ring focus:ring-sky-300"
               >
                 <option value="Nacional">Nacional</option>
@@ -485,10 +603,12 @@ const Modal = ({ title, data, onChange, onClose, onSubmit }) => (
               </select>
             ) : (
               <input
-                type="text"
+                type={field.name === "email" ? "email" : "text"}
                 name={field.name}
                 value={data[field.name]}
                 onChange={onChange}
+                required={field.required}
+                placeholder={field.name === "email" ? "ejemplo@dominio.com" : ""}
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
               />
             )}

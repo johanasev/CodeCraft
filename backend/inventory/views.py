@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Role, User, Product, Transaction, Supplier
@@ -86,6 +86,45 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.all()
         return User.objects.filter(id=self.request.user.id)
 
+    def destroy(self, request, *args, **kwargs):
+        """Prevenir eliminación si hay transacciones relacionadas"""
+        user = self.get_object()
+
+        # Verificar si hay transacciones relacionadas
+        has_transactions = Transaction.objects.filter(user=user).exists()
+
+        if has_transactions:
+            return Response({
+                'error': 'No se puede eliminar este usuario porque tiene transacciones registradas.',
+                'detail': 'Para mantener la integridad de los datos, considere inactivar el usuario en lugar de eliminarlo.',
+                'can_deactivate': True,
+                'user_id': user.id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        """Inactivar un usuario"""
+        user = self.get_object()
+        user.is_active = False
+        user.save()
+        return Response({
+            'message': f'Usuario "{user.email}" inactivado exitosamente',
+            'user': self.get_serializer(user).data
+        })
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activar un usuario"""
+        user = self.get_object()
+        user.is_active = True
+        user.save()
+        return Response({
+            'message': f'Usuario "{user.email}" activado exitosamente',
+            'user': self.get_serializer(user).data
+        })
+
     @action(detail=False, methods=['get'])
     def me(self, request):
         """Obtener perfil del usuario actual"""
@@ -108,10 +147,52 @@ class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def destroy(self, request, *args, **kwargs):
+        """Prevenir eliminación si hay transacciones relacionadas"""
+        product = self.get_object()
+
+        # Verificar si hay transacciones relacionadas
+        has_transactions = Transaction.objects.filter(product=product).exists()
+
+        if has_transactions:
+            return Response({
+                'error': 'No se puede eliminar este producto porque tiene transacciones registradas.',
+                'detail': 'Para mantener la integridad de los datos, considere inactivar el producto en lugar de eliminarlo.',
+                'can_deactivate': True,
+                'product_id': product.id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        """Inactivar un producto"""
+        product = self.get_object()
+        product.is_active = False
+        product.save()
+        return Response({
+            'message': f'Producto "{product.name}" inactivado exitosamente',
+            'product': self.get_serializer(product).data
+        })
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activar un producto"""
+        product = self.get_object()
+        product.is_active = True
+        product.save()
+        return Response({
+            'message': f'Producto "{product.name}" activado exitosamente',
+            'product': self.get_serializer(product).data
+        })
+
     @action(detail=False, methods=['get'])
     def low_stock(self, request):
-        """Obtener productos con stock bajo (menos de 10 unidades)"""
-        low_stock_products = Product.objects.filter(quantity__lt=10)
+        """Obtener productos con stock bajo (usando minimum_stock)"""
+        low_stock_products = Product.objects.filter(
+            quantity__lte=F('minimum_stock'),
+            is_active=True
+        )
         serializer = self.get_serializer(low_stock_products, many=True)
         return Response(serializer.data)
 
@@ -157,6 +238,40 @@ class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        """Crear transacción con validación de stock mínimo"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Obtener el producto y tipo de transacción
+        product = serializer.validated_data.get('product')
+        transaction_type = serializer.validated_data.get('type')
+        quantity = serializer.validated_data.get('quantity')
+
+        warnings = []
+
+        # Verificar stock mínimo para transacciones de salida
+        if transaction_type == 'salida':
+            stock_after_transaction = product.quantity - quantity
+
+            if stock_after_transaction <= product.minimum_stock:
+                warnings.append({
+                    'type': 'low_stock_warning',
+                    'message': f'ALERTA: Después de esta transacción, el producto "{product.name}" quedará en stock mínimo o por debajo.',
+                    'current_stock': product.quantity,
+                    'stock_after': stock_after_transaction,
+                    'minimum_stock': product.minimum_stock
+                })
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        response_data = serializer.data
+        if warnings:
+            response_data['warnings'] = warnings
+
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
         # Asignar el usuario actual a la transacción
@@ -208,7 +323,7 @@ def dashboard_stats(request):
     """Endpoint para estadísticas del dashboard"""
     total_products = Product.objects.count()
     total_transactions = Transaction.objects.count()
-    low_stock_count = Product.objects.filter(quantity__lt=10).count()
+    low_stock_count = Product.objects.filter(quantity__lte=F('minimum_stock'), is_active=True).count()
     total_revenue = Transaction.objects.filter(type='salida').aggregate(
         revenue=Sum('price'))['revenue'] or 0
     
@@ -276,29 +391,20 @@ def product_chart_data(request, product_id):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def inventory_overview_chart(request):
-    """Endpoint para gráfica general del inventario"""
-    # Obtener datos de los últimos 7 días
-    seven_days_ago = timezone.now() - timedelta(days=7)
-    
+    """Endpoint para gráfica general del inventario por producto"""
+    # Obtener todos los productos activos
+    products = Product.objects.filter(is_active=True).order_by('name')
+
     chart_data = []
-    for i in range(7):
-        date = seven_days_ago + timedelta(days=i)
-        day_transactions = Transaction.objects.filter(date__date=date.date())
-        
-        total_entries = day_transactions.filter(type='entrada').aggregate(
-            total=Sum('quantity'))['total'] or 0
-        total_exits = day_transactions.filter(type='salida').aggregate(
-            total=Sum('quantity'))['total'] or 0
-        daily_revenue = day_transactions.filter(type='salida').aggregate(
-            revenue=Sum('price'))['revenue'] or 0
-        
+    for product in products:
         chart_data.append({
-            'date': date.date(),
-            'entries': total_entries,
-            'exits': total_exits,
-            'revenue': daily_revenue
+            'name': product.name,
+            'quantity': product.quantity,
+            'minimum_stock': product.minimum_stock,
+            'is_low_stock': product.is_low_stock,
+            'reference': product.reference
         })
-    
+
     return Response(chart_data)
 
 
@@ -338,6 +444,45 @@ class SupplierViewSet(viewsets.ModelViewSet):
             )
 
         return queryset.order_by('name')
+
+    def destroy(self, request, *args, **kwargs):
+        """Prevenir eliminación si el proveedor está registrado en transacciones"""
+        supplier = self.get_object()
+
+        # Verificar si el proveedor está en alguna transacción
+        has_transactions = Transaction.objects.filter(supplier=supplier.name).exists()
+
+        if has_transactions:
+            return Response({
+                'error': 'No se puede eliminar este proveedor porque tiene transacciones registradas.',
+                'detail': 'Para mantener la integridad de los datos, considere inactivar el proveedor en lugar de eliminarlo.',
+                'can_deactivate': True,
+                'supplier_id': supplier.id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        """Inactivar un proveedor"""
+        supplier = self.get_object()
+        supplier.is_active = False
+        supplier.save()
+        return Response({
+            'message': f'Proveedor "{supplier.name}" inactivado exitosamente',
+            'supplier': self.get_serializer(supplier).data
+        })
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activar un proveedor"""
+        supplier = self.get_object()
+        supplier.is_active = True
+        supplier.save()
+        return Response({
+            'message': f'Proveedor "{supplier.name}" activado exitosamente',
+            'supplier': self.get_serializer(supplier).data
+        })
 
     @action(detail=False, methods=['get'])
     def by_type(self, request):

@@ -374,11 +374,33 @@ const TransactionManagementView = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData.inventory}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                            <p className="font-semibold">{data.name}</p>
+                            <p className="text-sm">Cantidad: {data.quantity}</p>
+                            <p className="text-sm">Stock Mínimo: {data.minimum_stock}</p>
+                            {data.is_low_stock && (
+                              <p className="text-sm text-red-600 font-semibold">⚠️ Stock Bajo</p>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
                   <Legend />
-                  <Bar dataKey="quantity" fill="#8b5cf6" name="Cantidad en Stock" />
+                  <Bar dataKey="quantity" name="Cantidad en Stock">
+                    {chartData.inventory.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.is_low_stock ? '#ef4444' : '#8b5cf6'} />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="minimum_stock" fill="#fbbf24" name="Stock Mínimo" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -493,7 +515,7 @@ const TransactionManagementView = () => {
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
                 >
                   <option value="">Seleccionar proveedor</option>
-                  {suppliers.map((supplier) => (
+                  {suppliers.filter(s => s.is_active).map((supplier) => (
                     <option key={supplier.id} value={supplier.name}>
                       {supplier.name} - {supplier.type}
                     </option>

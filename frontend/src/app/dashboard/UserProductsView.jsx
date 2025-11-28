@@ -1,39 +1,134 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { inventoryService } from '../../api/inventoryService';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
 const UserProductsView = () => {
-  // Datos de ejemplo para la tabla de productos
-  // NOTA: En una aplicación real, estos datos se obtendrían de Firestore.
-  const products = [
-    { id: '1', date: '2025-01-10', name: 'Camiseta Deportiva', category: 'Ropa', reference: 'REF-001', size: 'M', color: 'Azul', price: '$30000', supplier: 'Proveedor A', quantity: 50 },
-    { id: '2', date: '2025-02-05', name: 'Zapatos Running', category: 'Calzado', reference: 'REF-002', size: '42', color: 'Negro', price: '$120000', supplier: 'Proveedor B', quantity: 20 },
-    { id: '3', date: '2025-03-15', name: 'Pantalón Casual', category: 'Ropa', reference: 'REF-003', size: 'L', color: 'Gris', price: '$55000', supplier: 'Proveedor C', quantity: 75 },
-    { id: '4', date: '2025-04-01', name: 'Chaqueta Impermeable', category: 'Ropa', reference: 'REF-004', size: 'XL', color: 'Rojo', price: '$150000', supplier: 'Proveedor A', quantity: 15 },
-    { id: '5', date: '2025-05-20', name: 'Botas de Trabajo', category: 'Calzado', reference: 'REF-005', size: '40', color: 'Marrón', price: '$85000', supplier: 'Proveedor D', quantity: 40 },
-    { id: '6', date: '2025-06-10', name: 'Calcetines Deportivos', category: 'Accesorios', reference: 'REF-006', size: 'S', color: 'Blanco', price: '$5000', supplier: 'Proveedor C', quantity: 120 },
-    { id: '7', date: '2025-07-25', name: 'Gorra de Sol', category: 'Accesorios', reference: 'REF-007', size: 'Única', color: 'Verde', price: '$20000', supplier: 'Proveedor B', quantity: 30 },
-    { id: '8', date: '2025-08-01', name: 'Jersey Térmico', category: 'Ropa', reference: 'REF-008', size: 'M', color: 'Azul Oscuro', price: '$90000', supplier: 'Proveedor D', quantity: 60 },
-    // Agregamos más datos para forzar el scroll
-    { id: '9', date: '2025-09-01', name: 'Shorts de Natación', category: 'Ropa', reference: 'REF-009', size: 'L', color: 'Azul Claro', price: '$45000', supplier: 'Proveedor A', quantity: 25 },
-    { id: '10', date: '2025-10-10', name: 'Mochila de Viaje', category: 'Accesorios', reference: 'REF-010', size: 'Grande', color: 'Negro', price: '$180000', supplier: 'Proveedor C', quantity: 10 },
-    { id: '11', date: '2025-11-20', name: 'Tenis de Montaña', category: 'Calzado', reference: 'REF-011', size: '44', color: 'Café', price: '$140000', supplier: 'Proveedor B', quantity: 35 },
-    { id: '12', date: '2025-12-05', name: 'Bufanda de Lana', category: 'Accesorios', reference: 'REF-012', size: 'Única', color: 'Beige', price: '$35000', supplier: 'Proveedor D', quantity: 50 },
-  ];
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    name: '',
+    category: '',
+    reference: '',
+    estado: 'Todos'
+  });
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await inventoryService.getProducts();
+      setProducts(Array.isArray(data) ? data : (data.results || []));
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Error al cargar productos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Obtener categorías únicas para el filtro
+  const categories = useMemo(() => {
+    const uniqueCategories = Array.from(new Set(products.map(p => p.category || p.type).filter(Boolean)));
+    return uniqueCategories.sort();
+  }, [products]);
+
+  // Filtrar productos
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const isLowStock = product.is_low_stock || (product.quantity <= (product.minimum_stock || 10));
+
+      if (filters.name && !product.name.toLowerCase().includes(filters.name.toLowerCase())) return false;
+      if (filters.category && (product.category || product.type) !== filters.category) return false;
+      if (filters.reference && !product.reference.toLowerCase().includes(filters.reference.toLowerCase())) return false;
+      if (filters.estado === 'Stock Bajo' && !isLowStock) return false;
+      if (filters.estado === 'Normal' && isLowStock) return false;
+
+      return true;
+    });
+  }, [products, filters]);
 
   return (
     <div className="min-h-screen p-8 bg-slate-200">
       {/* Encabezado */}
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-4xl font-bold text-gray-800">Gestión de Productos</h2>
+        <h2 className="text-4xl font-bold text-gray-800">
+          Gestión de Productos {!loading && `(${filteredProducts.length} productos)`}
+        </h2>
         <div className="flex items-center text-sm font-semibold text-gray-600">
           <span>Sistema de Gestión de Inventarios</span>
           <span className="text-sky-600 ml-1">CodeCraft</span>
         </div>
       </div>
-      
+
+      {/* Loading & Error States */}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-xl text-gray-600">Cargando productos...</div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          {error}
+        </div>
+      )}
+
+      {/* Sección de Filtros */}
+      {!loading && !error && (
+        <div className="bg-white p-4 rounded-lg shadow-lg mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Filtro por Nombre */}
+            <input
+              type="text"
+              placeholder="Buscar por nombre..."
+              value={filters.name}
+              onChange={(e) => setFilters({...filters, name: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            />
+
+            {/* Filtro por Categoría */}
+            <select
+              value={filters.category}
+              onChange={(e) => setFilters({...filters, category: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            >
+              <option value="">Todas las categorías</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+
+            {/* Filtro por Referencia */}
+            <input
+              type="text"
+              placeholder="Buscar por referencia..."
+              value={filters.reference}
+              onChange={(e) => setFilters({...filters, reference: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            />
+
+            {/* Filtro por Estado */}
+            <select
+              value={filters.estado}
+              onChange={(e) => setFilters({...filters, estado: e.target.value})}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Stock Bajo">Stock Bajo</option>
+              <option value="Normal">Stock Normal</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Contenedor de la Tabla */}
-      {/* Usamos max-h-[80vh] y overflow-y-auto para permitir el scroll vertical
-          si la tabla es muy larga, manteniendo el encabezado fijo en la parte superior. */}
-      <div className="bg-white rounded-lg shadow-lg p-0 relative max-h-[80vh] overflow-y-auto">
+      {!loading && !error && (
+        <div className="bg-white rounded-lg shadow-lg p-0 relative max-h-[80vh] overflow-y-auto">
         <table className="min-w-full table-auto">
           {/* Cabecera de la tabla - Fija en el scroll */}
           <thead className="sticky top-0 bg-white shadow-md z-20">
@@ -47,30 +142,60 @@ const UserProductsView = () => {
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap">Color</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap">Precio</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap">Proveedor</th>
+              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap">Stock Mínimo</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap">Cantidad</th>
+              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap">Estado</th>
             </tr>
           </thead>
           
           {/* Cuerpo de la tabla */}
           <tbody>
-            {products.map((product) => (
-              <tr key={product.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.id}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.date}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.name}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.category}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.reference}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.size}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.color}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.price}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.supplier}</td>
-                <td className="py-4 px-4 text-sm text-gray-700 font-medium whitespace-nowrap">{product.quantity}</td>
-                {/* NOTA: No hay botones de Editar/Eliminar, ya que es una vista de solo lectura */}
+            {filteredProducts.length === 0 ? (
+              <tr>
+                <td colSpan="12" className="text-center py-6 text-gray-500">
+                  No se encontraron productos con los filtros aplicados
+                </td>
               </tr>
-            ))}
+            ) : (
+              filteredProducts.map((product) => {
+                const isLowStock = product.is_low_stock || (product.quantity <= (product.minimum_stock || 10));
+                return (
+                  <tr key={product.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isLowStock ? 'bg-red-50' : ''}`}>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.id}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">
+                      {product.created_at ? new Date(product.created_at).toLocaleDateString() : '-'}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.name}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.category}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.reference}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.size || '-'}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.color || '-'}</td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">
+                      ${product.price ? product.price.toLocaleString() : '0'}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">
+                      {product.supplier_name || product.supplier || '-'}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{product.minimum_stock || 10}</td>
+                    <td className={`py-4 px-4 text-sm font-medium whitespace-nowrap ${isLowStock ? 'text-red-600 font-bold' : 'text-gray-700'}`}>
+                      {product.quantity || 0}
+                    </td>
+                    <td className="py-4 px-4 text-sm whitespace-nowrap">
+                      {isLowStock && (
+                        <div className="flex items-center gap-1 text-red-600">
+                          <FaExclamationTriangle />
+                          <span className="font-semibold text-xs">Stock Bajo</span>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

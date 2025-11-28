@@ -92,7 +92,7 @@ class Product(models.Model):
         ('deportiva', 'Ropa Deportiva'),
         ('abrigos', 'Abrigos y Chaquetas'),
     ]
-    
+
     SIZE_CHOICES = [
         ('XS', 'Extra Pequeño'),
         ('S', 'Pequeño'),
@@ -102,7 +102,7 @@ class Product(models.Model):
         ('XXL', 'Doble Extra Grande'),
         ('UNICA', 'Talla Única'),
     ]
-    
+
     name = models.CharField(max_length=150, verbose_name='Nombre')
     type = models.CharField(max_length=50, choices=CATEGORY_CHOICES, verbose_name='Tipo/Categoría')
     quantity = models.IntegerField(default=0, verbose_name='Cantidad')
@@ -110,10 +110,18 @@ class Product(models.Model):
     size = models.CharField(max_length=10, choices=SIZE_CHOICES, verbose_name='Talla')
     reference = models.CharField(max_length=50, unique=True, verbose_name='Referencia')
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Precio')
-    
+    minimum_stock = models.IntegerField(default=10, verbose_name='Stock Mínimo')
+    is_active = models.BooleanField(default=True, verbose_name='Activo')
+    created_at = models.DateTimeField(default=timezone.now, verbose_name='Fecha de creación')
+
     def __str__(self):
         return f"{self.name} - {self.size}"
-    
+
+    @property
+    def is_low_stock(self):
+        """Retorna True si el producto está en stock mínimo o por debajo"""
+        return self.quantity <= self.minimum_stock
+
     class Meta:
         db_table = 'products'
         verbose_name = 'Producto'
@@ -133,6 +141,7 @@ class Supplier(models.Model):
     email = models.EmailField(verbose_name='Correo Electrónico')
     address = models.TextField(verbose_name='Dirección')
     registration_date = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Registro')
+    is_active = models.BooleanField(default=True, verbose_name='Activo')
 
     def __str__(self):
         return f"{self.name} - {self.type}"

@@ -11,7 +11,7 @@ import Suppliers from './Suppliers.jsx';
 const AdminDashboard = ({ userName }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [image, setImage] = useState(null);
 
   const handleImageUpload = (e) => {
@@ -36,8 +36,12 @@ const AdminDashboard = ({ userName }) => {
     }
   };
 
-  // Se asegura que la prop userName se muestre, o usa un default si es null
-  const displayName = userName || 'Rayan Adlardard';
+  // Se asegura que la prop userName se muestre, o usa los datos del usuario autenticado
+  const displayName = user?.first_name && user?.last_name
+    ? `${user.first_name} ${user.last_name}`
+    : (userName || user?.username || 'Usuario');
+  const userRole = user?.role || 'ADMINISTRADOR';
+  const userDepartment = user?.department || 'Recursos Humanos';
   const isTransactionsActive = location.pathname === '/admin/transactions';
 
   // Contenido de Bienvenida por defecto cuando no hay ruta específica seleccionada
@@ -107,8 +111,8 @@ const AdminDashboard = ({ userName }) => {
               </label>
             </div>
             <h2 className="text-sm font-semibold text-gray-800">{displayName}</h2>
-            <p className="text-xs text-gray-600">Recursos Humanos</p>
-            <span className="text-xs text-gray-400">ADMINISTRADOR</span>
+            <p className="text-xs text-gray-600">{userDepartment}</p>
+            <span className="text-xs text-gray-400">{userRole}</span>
           </div>
 
           {/* Navigation Buttons - Botones de navegación */}

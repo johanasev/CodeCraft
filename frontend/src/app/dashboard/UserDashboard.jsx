@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 // Importa las vistas de usuario aquí cuando estén listas
 // import UserTransactionsView from './UserTransactionsView';
 import UserProductsView from './UserProductsView';
@@ -8,8 +9,9 @@ import UserTransactionsView from './UserTransactionsView.jsx';
 
 const UserDashboard = ({ userName }) => {
   const location = useLocation();
+  const { user } = useAuth();
   const [image, setImage] = useState(null);
-  
+
   // Define un color azul más claro o diferente para distinguirlo del Admin, si es necesario.
   // Usaremos el mismo 'bg-sky-500' que el Admin para mantener la estética, pero ajustamos el activo.
   const CODECRAFT_BLUE = 'bg-sky-500';
@@ -27,7 +29,11 @@ const UserDashboard = ({ userName }) => {
     // NOTA: Se ha eliminado el error de sintaxis "const UserDashboard = ({ userName }) => {}"
   };
 
-  const displayName = userName || 'Pedro Pérez';
+  const displayName = user?.first_name && user?.last_name
+    ? `${user.first_name} ${user.last_name}`
+    : (userName || user?.username || 'Usuario');
+  const userRole = user?.role || 'USUARIO';
+  const userDepartment = user?.department || 'Almacén';
   const isTransactionsActive = location.pathname === '/user/transactions';
   const isProductsActive = location.pathname === '/user/products';
 
@@ -87,27 +93,27 @@ const UserDashboard = ({ userName }) => {
               </label>
             </div>
             <h2 className="text-sm font-semibold text-gray-800">{displayName}</h2>
-            <p className="text-xs text-gray-600">Almacén</p>
-            <span className="text-xs text-gray-400">USUARIO</span>
+            <p className="text-xs text-gray-600">{userDepartment}</p>
+            <span className="text-xs text-gray-400">{userRole}</span>
           </div>
-          
+
           {/* Navigation Buttons - Botones de navegación */}
           <nav className="flex flex-col space-y-2">
-            <Link 
-              to="/user/transactions" 
+            <Link
+              to="/user/transactions"
               className={`w-full text-center py-2 px-4 rounded-lg transition-colors text-white ${isTransactionsActive ? 'bg-sky-600 shadow-lg' : 'bg-codecraftBlue hover:bg-sky-500'}`}
             >
               Transacciones
             </Link>
-            <Link 
-              to="/user/products" 
+            <Link
+              to="/user/products"
               className={"w-full text-center py-2 px-4 rounded-lg text-white bg-codecraftBlue hover:bg-sky-500 transition-colors"}
             >
               Productos
             </Link>
           </nav>
         </div>
-        
+
         {/* Logout Button - Botón de cerrar sesión */}
         <div className="p-4">
           <Link to="/" className="w-full text-center block mb-10 py-3 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors">
@@ -115,9 +121,9 @@ const UserDashboard = ({ userName }) => {
           </Link>
         </div>
       </div>
-      
+
       {/* Main Content - Contenido principal */}
-      <div className="flex-1 overflow-y-auto ml-56"> 
+      <div className="flex-1 overflow-y-auto ml-56">
         {mainContent}
       </div>
     </div>

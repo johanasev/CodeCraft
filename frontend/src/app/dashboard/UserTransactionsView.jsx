@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
-// Se eliminan los imports de useNavigate, FaEdit, FaTrash.
+import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-// NOTA: Se asume que mockData.js con initialTransactions, monthNames, y uniqueFilters está disponible.
-// Si no, puedes copiar las variables y funciones de utilidades al inicio de este archivo, como en el ejemplo anterior.
-import { initialTransactions, monthNames } from './mockData'; 
+import { inventoryService } from '../../api/inventoryService';
+
+const monthNames = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]; 
 
 
 // Función auxiliar para generar el siguiente ID consecutivo (Necesaria para el Modal)
@@ -35,13 +37,14 @@ const generateChartData = (transactions) => {
 
   transactions.forEach(trx => {
     const date = new Date(trx.date);
-    const monthIndex = date.getMonth(); 
-    
+    const monthIndex = date.getMonth();
+    const transactionType = trx.transaction_type || trx.type;
+
     if (monthIndex >= 0 && monthIndex < 12) {
-      if (trx.type === 'ENTRADA') {
-        monthlyDataMap[monthIndex].Ingresos += trx.quantity;
-      } else if (trx.type === 'SALIDA') {
-        monthlyDataMap[monthIndex].Salidas += trx.quantity;
+      if (transactionType === 'ENTRADA') {
+        monthlyDataMap[monthIndex].Ingresos += trx.quantity || 0;
+      } else if (transactionType === 'SALIDA') {
+        monthlyDataMap[monthIndex].Salidas += trx.quantity || 0;
       }
     }
   });
@@ -57,9 +60,13 @@ const generateChartData = (transactions) => {
 const getDependentFilters = (transactions, currentFilters) => {
   const getFilteredSet = (fieldToExclude) => {
     return transactions.filter(trx => {
-      if (fieldToExclude !== 'product' && currentFilters.product && trx.product !== currentFilters.product) return false;
-      if (fieldToExclude !== 'user' && currentFilters.user && trx.user !== currentFilters.user) return false;
-      if (fieldToExclude !== 'reference' && currentFilters.reference && trx.reference !== currentFilters.reference) return false;
+      const product = trx.product_name || trx.product;
+      const user = trx.user_name || trx.user;
+      const reference = trx.reference;
+
+      if (fieldToExclude !== 'product' && currentFilters.product && product !== currentFilters.product) return false;
+      if (fieldToExclude !== 'user' && currentFilters.user && user !== currentFilters.user) return false;
+      if (fieldToExclude !== 'reference' && currentFilters.reference && reference !== currentFilters.reference) return false;
       return true;
     });
   };
@@ -69,17 +76,57 @@ const getDependentFilters = (transactions, currentFilters) => {
   const referenceSet = getFilteredSet('reference');
 
   return {
-    products: Array.from(new Set(productSet.map(t => t.product))).sort(),
-    users: Array.from(new Set(userSet.map(t => t.user))).sort(),
-    references: Array.from(new Set(referenceSet.map(t => t.reference))).sort(),
+    products: Array.from(new Set(productSet.map(t => t.product_name || t.product).filter(Boolean))).sort(),
+    users: Array.from(new Set(userSet.map(t => t.user_name || t.user).filter(Boolean))).sort(),
+    references: Array.from(new Set(referenceSet.map(t => t.reference).filter(Boolean))).sort(),
   };
 };
 
 const UserTransactionsView = () => {
-  // Estado principal de todas las transacciones (la base de datos simulada)
-  // Se eliminó la dependencia de useNavigate.
-  const [transactions, setTransactions] = useState(initialTransactions);
-  const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el modal
+  const [transactions, setTransactions] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchTransactions();
+    fetchProducts();
+    fetchSuppliers();
+  }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true);
+      const data = await inventoryService.getTransactions();
+      setTransactions(Array.isArray(data) ? data : (data.results || []));
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setError('Error al cargar transacciones');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const data = await inventoryService.getProducts();
+      setProducts(Array.isArray(data) ? data : (data.results || []));
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+
+  const fetchSuppliers = async () => {
+    try {
+      const data = await inventoryService.getSuppliers();
+      setSuppliers(Array.isArray(data) ? data : (data.results || []));
+    } catch (err) {
+      console.error('Error fetching suppliers:', err);
+    }
+  };
   
   // Estado para guardar los valores de los filtros seleccionados
   const [filters, setFilters] = useState({
@@ -104,9 +151,13 @@ const UserTransactionsView = () => {
   // --- LÓGICA DE FILTRADO (useMemo) ---
   const filteredTransactions = useMemo(() => {
     return transactions.filter(trx => {
-      if (filters.product && trx.product !== filters.product) { return false; }
-      if (filters.user && trx.user !== filters.user) { return false; }
-      if (filters.reference && trx.reference !== filters.reference) { return false; }
+      const product = trx.product_name || trx.product;
+      const user = trx.user_name || trx.user;
+      const reference = trx.reference;
+
+      if (filters.product && product !== filters.product) { return false; }
+      if (filters.user && user !== filters.user) { return false; }
+      if (filters.reference && reference !== filters.reference) { return false; }
       return true;
     });
   }, [transactions, filters]);
@@ -133,16 +184,15 @@ const UserTransactionsView = () => {
   const [formData, setFormData] = useState({
     date: '',
     product: '',
-    reference: '',
-    type: 'ENTRADA',
+    type: 'entrada',
     quantity: '',
-    user: '',
-    observation: ''
+    supplier: '',
+    price: ''
   });
 
 
   return (
-    <div className="p-8 bg-slate-100 min-h-screen"> 
+    <div className="p-8 bg-slate-100 min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Transacciones de Inventario</h1>
@@ -151,7 +201,21 @@ const UserTransactionsView = () => {
         </div>
       </div>
 
+      {/* Loading & Error States */}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-xl text-gray-600">Cargando transacciones...</div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          {error}
+        </div>
+      )}
+
       {/* Sección de Filtros */}
+      {!loading && !error && (
       <div className="bg-white p-4 rounded-xl shadow-lg mb-6 flex flex-wrap gap-4">
         {/* Filtro por Producto */}
         <select 
@@ -195,8 +259,10 @@ const UserTransactionsView = () => {
           ))}
         </select>
       </div>
+      )}
 
       {/* Tabla de Historial de Transacciones */}
+      {!loading && !error && (
       <div className="bg-white p-6 rounded-xl shadow-lg mb-6 overflow-x-auto">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-700">Historial de Transacciones ({filteredTransactions.length} resultados)</h2>
@@ -222,6 +288,7 @@ const UserTransactionsView = () => {
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Referencia</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tipo Transacción</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Cantidad</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Proveedor</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Realizado por</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Observación</th>
                 {/* Se eliminó la columna de Acciones */}
@@ -231,30 +298,35 @@ const UserTransactionsView = () => {
               {/* Iteramos sobre las transacciones FILTRADAS */}
               {filteredTransactions.map((transaction) => (
                 <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
-                  {/* Alineación a la izquierda en los TD */}
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">{transaction.id}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.date}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.product}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.reference}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-left">
-                    {getTypeBadge(transaction.type)}
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">
+                    {transaction.date ? new Date(transaction.date).toLocaleDateString() : '-'}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.quantity}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.user}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs text-left">{transaction.observation}</td>
-                  {/* Se eliminó la celda de Acciones */}
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">
+                    {transaction.product_name || transaction.product || '-'}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.reference || '-'}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-left">
+                    {getTypeBadge(transaction.transaction_type || transaction.type)}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.quantity || 0}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">{transaction.supplier || '-'}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">
+                    {transaction.user_name || transaction.user || '-'}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs text-left">
+                    {transaction.observation || '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+      )}
 
-      {/* Se eliminó la sección de botones de Acción, dejando solo el botón Agregar Movimiento
-        que ahora está en el encabezado de la tabla para mejor layout.
-      */}
-      
       {/* Gráfico de Resumen de Movimientos (Gráfica dinámica que usa los datos FILTRADOS) */}
+      {!loading && !error && (
       <div className="bg-white p-6 rounded-xl shadow-lg">
         <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">Resumen de Movimientos por Mes</h2>
         <div style={{ width: '100%', height: 300 }}>
@@ -283,7 +355,8 @@ const UserTransactionsView = () => {
           )}
         </div>
       </div>
-      
+      )}
+
      {/* --- MODAL PARA AGREGAR MOVIMIENTO --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -291,112 +364,110 @@ const UserTransactionsView = () => {
             <h2 className="text-2xl font-bold mb-4 text-gray-800">Agregar Nuevo Movimiento</h2>
             
             {/* FORMULARIO */}
-            <form 
-              onSubmit={(e) => {
+            <form
+              onSubmit={async (e) => {
                 e.preventDefault();
-                // Crear nuevo objeto de transacción
-                const newTransaction = {
-                  id: generateNextId(transactions),
-                  date: formData.date || new Date().toISOString().slice(0, 10),
-                  product: formData.product,
-                  reference: formData.reference,
-                  type: formData.type,
-                  quantity: Number(formData.quantity),
-                  user: formData.user,
-                  observation: formData.observation,
-                };
-                
-                // Actualizar el estado
-                setTransactions([...transactions, newTransaction]);
-                setIsModalOpen(false);
-                setFormData({ // limpiar campos
-                  date: '',
-                  product: '',
-                  reference: '',
-                  type: 'ENTRADA',
-                  quantity: '',
-                  user: '',
-                  observation: ''
-                });
+
+                try {
+                  const transactionData = {
+                    product: parseInt(formData.product),
+                    type: formData.type,
+                    quantity: parseInt(formData.quantity),
+                    supplier: formData.supplier || '',
+                    price: parseFloat(formData.price) || 0
+                  };
+
+                  await inventoryService.createTransaction(transactionData);
+                  await fetchTransactions();
+                  setIsModalOpen(false);
+                  setFormData({
+                    date: '',
+                    product: '',
+                    type: 'entrada',
+                    quantity: '',
+                    supplier: '',
+                    price: ''
+                  });
+                } catch (err) {
+                  console.error('Error creating transaction:', err);
+                  const errorMsg = err.response?.data?.detail || err.response?.data?.message || JSON.stringify(err.response?.data) || err.message;
+                  alert('Error al crear transacción: ' + errorMsg);
+                }
               }}
               className="space-y-4"
             >
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Fecha</label>
-                  <input 
-                    type="date" 
-                    value={formData.date}
-                    onChange={(e) => setFormData({...formData, date: e.target.value})}
-                    className="w-full border rounded-lg p-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Producto</label>
-                  <input 
-                    type="text" 
-                    value={formData.product}
-                    onChange={(e) => setFormData({...formData, product: e.target.value})}
-                    required
-                    className="w-full border rounded-lg p-2"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Producto</label>
+                <select
+                  name="product"
+                  value={formData.product}
+                  onChange={(e) => setFormData({...formData, product: e.target.value})}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                >
+                  <option value="">Seleccionar producto</option>
+                  {products.filter(p => p.is_active).map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} - {product.reference}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Referencia</label>
-                  <input 
-                    type="text" 
-                    value={formData.reference}
-                    onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                    required
-                    className="w-full border rounded-lg p-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tipo</label>
-                  <select 
+                  <label className="block text-sm font-medium mb-1">Tipo de Transacción</label>
+                  <select
+                    name="type"
                     value={formData.type}
                     onChange={(e) => setFormData({...formData, type: e.target.value})}
-                    className="w-full border rounded-lg p-2"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
                   >
-                    <option value="ENTRADA">ENTRADA</option>
-                    <option value="SALIDA">SALIDA</option>
+                    <option value="entrada">ENTRADA</option>
+                    <option value="salida">SALIDA</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cantidad</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                    min="1"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Cantidad</label>
-                  <input 
-                    type="number" 
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                    required
-                    className="w-full border rounded-lg p-2"
-                  />
+                  <label className="block text-sm font-medium mb-1">Proveedor (opcional)</label>
+                  <select
+                    name="supplier"
+                    value={formData.supplier}
+                    onChange={(e) => setFormData({...formData, supplier: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
+                  >
+                    <option value="">Seleccionar proveedor</option>
+                    {suppliers.filter(s => s.is_active).map((supplier) => (
+                      <option key={supplier.id} value={supplier.name}>
+                        {supplier.name} - {supplier.type}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Usuario</label>
-                  <input 
-                    type="text" 
-                    value={formData.user}
-                    onChange={(e) => setFormData({...formData, user: e.target.value})}
-                    required
-                    className="w-full border rounded-lg p-2"
+                  <label className="block text-sm font-medium mb-1">Precio Unitario</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={(e) => setFormData({...formData, price: e.target.value})}
+                    min="0"
+                    step="0.01"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-sky-300"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Observación</label>
-                <textarea 
-                  value={formData.observation}
-                  onChange={(e) => setFormData({...formData, observation: e.target.value})}
-                  className="w-full border rounded-lg p-2"
-                />
               </div>
 
               <div className="flex justify-end space-x-3 mt-4">

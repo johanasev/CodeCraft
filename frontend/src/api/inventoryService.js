@@ -173,5 +173,38 @@ export const inventoryService = {
   deleteSupplier: async (id) => {
     const response = await api.delete(`/api/suppliers/${id}/`);
     return response.data;
+  },
+
+  // Activar/Desactivar Proveedores
+  deactivateSupplier: async (id) => {
+    const response = await api.post(`/api/suppliers/${id}/deactivate/`);
+    return response.data;
+  },
+
+  activateSupplier: async (id) => {
+    const response = await api.post(`/api/suppliers/${id}/activate/`);
+    return response.data;
+  },
+
+  // Activar/Desactivar Productos
+  deactivateProduct: async (id) => {
+    const response = await api.post(`/api/products/${id}/deactivate/`);
+    return response.data;
+  },
+
+  activateProduct: async (id) => {
+    const response = await api.post(`/api/products/${id}/activate/`);
+    return response.data;
+  },
+
+  // Activar/Desactivar Usuarios
+  deactivateUser: async (id) => {
+    const response = await api.post(`/api/users/${id}/deactivate/`);
+    return response.data;
+  },
+
+  activateUser: async (id) => {
+    const response = await api.post(`/api/users/${id}/activate/`);
+    return response.data;
   }
 };
